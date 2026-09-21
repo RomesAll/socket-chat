@@ -42,6 +42,15 @@ class Base(DeclarativeBase):
         result = [f'{col}={value}' for col, value in sorted_cols]
         return f"<{self.__class__.__name__}({', '.join(result)})>"
 
+    def to_dict(self, exclude_none: bool = False) -> dict:
+        """Преобразование orm объекта в python словарь"""
+        results = {}
+        for col in self.__table__.columns.keys():
+            if (value := getattr(self, col)) is None and exclude_none:
+                continue
+            results[col] = value
+        return results
+
     @staticmethod
     def sorted_column(items) -> tuple:
         """Функция сортировки для того, чтобы атрибут id был всегда на первом месте"""
