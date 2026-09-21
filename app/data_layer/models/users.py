@@ -1,9 +1,12 @@
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 from sqlalchemy import LargeBinary, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from .base import Base, StrIdMixin, IntIdMixin
 
+if TYPE_CHECKING:
+    from .rooms import Room
 
 class RoleEnum(str, Enum):
     """Перечисление списка ролей"""
@@ -16,12 +19,18 @@ class User(StrIdMixin, Base):
     """Orm модель для хранения информации о пользователях"""
     display_name: Mapped[str]
     avatar_url: Mapped[str]
-    user_info_id: Mapped[int] = mapped_column(ForeignKey('user_info.id', ondelete='CASCADE'))
-    user_info: Mapped['UserInfo'] = relationship(back_populates='user', uselist=False)
+    user_info: Mapped["UserInfo"] = relationship(
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
+    rooms: Mapped[list['Room']] = relationship(back_populates='user')
 
 
-class UserInfo(IntIdMixin, Base):
+class UserInfo(Base):
     """Orm модель для хранения расширенной информации о пользователях"""
+    id: Mapped[str] = mapped_column(ForeignKey('user.id', ondelete='CASCADE'), primary_key=True)
     description: Mapped[str] = mapped_column(default=None, nullable=True)
     years_old: Mapped[int] = mapped_column(default=None, nullable=True)
     role: Mapped[RoleEnum] = mapped_column(default=RoleEnum.DEFAULT_USER)
