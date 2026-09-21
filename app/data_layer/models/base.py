@@ -1,10 +1,18 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr
 from uuid import UUID
+import re
 
 
 class Base(DeclarativeBase):
     """Базовый класс для orm моделей sqlalchemy"""
-    pass
+    @classmethod
+    @declared_attr.directive
+    def __tablename__(cls) -> str:
+        """
+        Автоматическое определение названия таблицы по название класса.
+        Превращает CamelCase в snake_case
+        """
+        return re.sub(r'(?<!^)(?=[A-Z])', r'_', cls.__name__).lower()
 
 
 class IntIdMixin:
