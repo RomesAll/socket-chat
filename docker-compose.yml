@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  chat_app:
+    build: .
+    container_name: chat
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+    profiles: ["app"]
+    volumes:
+      - .:/app
+
+  redis:
+    image: redis:5-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6381:6379"
+    command: redis-server --requirepass ${REDIS__PASSWORD} --appendonly yes
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres
+    restart: always
+    ports:
+      - "5439:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES__USER}
+      POSTGRES_PASSWORD: ${POSTGRES__PASSWORD}
+      POSTGRES_DB: ${POSTGRES__DB}
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin_panel
+    restart: always
+    ports:
+      - "5045:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB__USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB__PASSWORD}
