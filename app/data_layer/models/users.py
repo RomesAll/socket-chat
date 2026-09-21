@@ -3,10 +3,11 @@ from enum import Enum
 from typing import TYPE_CHECKING
 from sqlalchemy import LargeBinary, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
-from .base import Base, StrIdMixin, IntIdMixin
+from .base import Base, StrIdMixin
 
 if TYPE_CHECKING:
-    from .rooms import Room
+    from .rooms import RoomMember, Room
+
 
 class RoleEnum(str, Enum):
     """Перечисление списка ролей"""
@@ -25,7 +26,14 @@ class User(StrIdMixin, Base):
         cascade="all, delete-orphan",
         single_parent=True,
     )
-    rooms: Mapped[list['Room']] = relationship(back_populates='user')
+    room_members: Mapped[list['RoomMember']] = relationship(
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
+    owned_rooms: Mapped[list['Room']] = relationship(
+        back_populates='owner',
+        foreign_keys='Room.owner_id',
+    )
 
 
 class UserInfo(Base):
