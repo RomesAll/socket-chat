@@ -37,7 +37,7 @@ class Message(UuidIsMixin, Base):
     deleted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    message_file: Mapped[list['MessageAttachment']] = relationship(back_populates='message_attachment', cascade='all, delete-orphan',)
+    message_file: Mapped[list['MessageAttachment']] = relationship(back_populates='message_attachment', cascade='all, delete-orphan')
 
 
 class MessageAttachment(IntIdMixin, Base):
@@ -49,7 +49,7 @@ class MessageAttachment(IntIdMixin, Base):
     file_path: Mapped[str]
     mime_type: Mapped[str]
     size: Mapped[int]
-    message_attachment: Mapped['Message'] = relationship(back_populates='message_file', cascade='all, delete-orphan',)
+    message_attachment: Mapped['Message'] = relationship(back_populates='message_file')
 
     @property
     def file(self) -> Path:
