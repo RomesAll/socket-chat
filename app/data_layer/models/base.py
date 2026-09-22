@@ -15,7 +15,6 @@ class Base(DeclarativeBase):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    @classmethod
     @declared_attr.directive
     def __tablename__(cls) -> str:
         """
