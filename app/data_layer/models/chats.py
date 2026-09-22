@@ -30,18 +30,16 @@ class Chat(UuidIsMixin, Base):
 class ChatMember(Base):
     """Orm модель для хранения информации об участниках чата"""
     chat_id: Mapped[UUID] = mapped_column(
-        ForeignKey('room.id', ondelete='CASCADE'),
-        nullable=True,
-        default=None
+        ForeignKey('chat.id', ondelete='CASCADE'),
+        primary_key=True
     )
     user_id: Mapped[str] = mapped_column(
-        ForeignKey('room.id', ondelete='CASCADE'),
-        nullable=True,
-        default=None
+        ForeignKey('user.id', ondelete='CASCADE'),
+        primary_key=True
     )
     last_read_message_id: Mapped[UUID] = mapped_column(
         default=None,
         nullable=True
     )
     mute: Mapped[bool] = mapped_column(default=False)
-    chat: Mapped['ChatMember'] = relationship(back_populates='members')
+    chat: Mapped['Chat'] = relationship(back_populates='members')
