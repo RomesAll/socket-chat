@@ -7,6 +7,7 @@ from app.data_layer.models import Room, RoomRole, RoomMember
 
 
 class RoomRepository(BaseRepository[Room]):
+    """Репозиторий для работы с данными комнат"""
     MODEL: type[Room] = Room
     ROOM_MEMBER_MODEL: type[RoomMember] = RoomMember
 
