@@ -1,16 +1,26 @@
 from datetime import datetime, date, timedelta
 from uuid import UUID
 from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
+
+from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.data_layer.models import Message, MessageAttachment
-from app.shared.dto.message import MessageDtoSave, MessageDtoUpdate
+from app.shared.dto.message import MessageDtoSave, MessageDtoUpdate, MessageAttachmentDtoSave
 
 
 class MessageRepository(BaseRepository[Message]):
     """Репозиторий для работы с сообщениями"""
     MODEL: type[Message] = Message
     MESSAGE_ATTACHMENT_MODEL: type[MessageAttachment] = MessageAttachment
+
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.MAPPING_DTO_ORM_SAVE.update({
+            MessageDtoSave: Message,
+            MessageAttachmentDtoSave: MessageAttachment
+        })
 
     async def get_message_by_chat(self, date_limit: date, chat_id: UUID, with_relation: bool = False) -> list[Message]:
         """Получение сообщений по чату"""
@@ -64,7 +74,7 @@ class MessageRepository(BaseRepository[Message]):
         sqla_obj = await self.session.execute(stmt)
         msg_file = sqla_obj.scalar_one_or_none()
         if not msg_file:
-            raise Exception
+            raise RecordNotFound(file_id, self.MODEL, 'id')
         return msg_file
 
     def _with_msg_options(self):

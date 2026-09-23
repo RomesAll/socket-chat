@@ -1,8 +1,11 @@
 from uuid import UUID
 from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
+
+from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
-from app.shared.dto.room import RoomDtoUpdate, RoomMemberDtoSave
+from app.shared.dto.room import RoomDtoUpdate, RoomMemberDtoSave, RoomDtoSave
 from app.data_layer.models import Room, RoomRole, RoomMember
 
 
@@ -10,6 +13,13 @@ class RoomRepository(BaseRepository[Room]):
     """Репозиторий для работы с данными комнат"""
     MODEL: type[Room] = Room
     ROOM_MEMBER_MODEL: type[RoomMember] = RoomMember
+
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.MAPPING_DTO_ORM_SAVE.update({
+            RoomDtoSave: Room,
+            RoomMemberDtoSave: RoomMember
+        })
 
     async def get_rooms(self, with_relation: bool = False) -> list[Room]:
         """Получение списка комнат"""
@@ -61,7 +71,7 @@ class RoomRepository(BaseRepository[Room]):
         sqla_obj = await self.session.execute(stmt)
         member = sqla_obj.scalar_one_or_none()
         if not member:
-            raise Exception
+            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL, 'id')
         member.role = new_role
         return member
 
