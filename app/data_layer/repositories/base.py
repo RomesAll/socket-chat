@@ -2,21 +2,16 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import TypeVar, Generic, Any
-from app.data_layer.models import Base, Room, RoomMember, User, UserInfo
-from app.shared.dto.room import RoomDtoSave, RoomMemberDtoSave
-from app.shared.dto.user import UserDtoSave, UserDtoInfoSave
+from app.data_layer.exceptions import RecordNotFound, OrmModelNotFound
+from app.data_layer.models import Base
+from app.data_layer.repositories.metaclass_repo import RepoMeta
 
 TOrmModel = TypeVar('TOrmModel', bound=Base)
 
 
-class BaseRepository(Generic[TOrmModel]):
+class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
     MODEL: type[Base] = Base
-    MAPPING_DTO_ORM_SAVE = {
-        RoomDtoSave: Room,
-        RoomMemberDtoSave: RoomMember,
-        UserDtoSave: User,
-        UserDtoInfoSave: UserInfo
-    }
+    MAPPING_DTO_ORM_SAVE = {}
 
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -40,10 +35,11 @@ class BaseRepository(Generic[TOrmModel]):
         :return:
         """
         if not isinstance(dto, BaseModel):
-            raise Exception
+            raise TypeError('Для сохранения данных в таблицу через '
+                            'репозиторий необходимо передать объект BaseModel')
         model = cls.MAPPING_DTO_ORM_SAVE.get(type(dto), None)
         if not model:
-            raise Exception
+            raise OrmModelNotFound(dto)
         raw_data = {}
         for field in dto.model_fields.keys():
             value = getattr(dto, field)
@@ -75,7 +71,7 @@ class BaseRepository(Generic[TOrmModel]):
         sqla_obj = await self.session.execute(stmt)
         result = sqla_obj.scalar_one_or_none()
         if not result:
-            raise Exception
+            raise RecordNotFound(record_id, self.MODEL, 'id')
         return result
 
     async def save(self, request: BaseModel) -> TOrmModel:
