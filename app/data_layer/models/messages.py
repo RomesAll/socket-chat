@@ -35,12 +35,15 @@ class Message(UuidIsMixin, Base):
     is_edited: Mapped[bool] = mapped_column(default=False)
     is_deleted: Mapped[bool] = mapped_column(default=False)
     deleted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), nullable=True, default=None
     )
-    message_file: Mapped[list['MessageAttachment']] = relationship(back_populates='message_attachment', cascade='all, delete-orphan')
+    message_file: Mapped[list['MessageAttachment']] = relationship(
+        back_populates='message_info',
+        cascade='all, delete-orphan'
+    )
 
 
-class MessageAttachment(IntIdMixin, Base):
+class MessageAttachment(UuidIsMixin, Base):
     """Orm модель для хранения информации о метаданных файла в сообщениях"""
     message_id: Mapped[UUID] = mapped_column(
         ForeignKey('message.id', ondelete='CASCADE'),
@@ -49,7 +52,9 @@ class MessageAttachment(IntIdMixin, Base):
     file_path: Mapped[str]
     mime_type: Mapped[str]
     size: Mapped[int]
-    message_attachment: Mapped['Message'] = relationship(back_populates='message_file')
+    message_info: Mapped['Message'] = relationship(
+        back_populates='message_file'
+    )
 
     @property
     def file(self) -> Path:
