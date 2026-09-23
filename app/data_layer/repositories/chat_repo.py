@@ -1,15 +1,24 @@
 from uuid import UUID
 from sqlalchemy import select, and_, delete
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
+from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.data_layer.models import Chat, ChatMember
-from app.shared.dto.chat import ChatDtoSave, ChatDtoUpdate, ChatMemberDtoSave, ChatMemberDtoUpdate
+from app.shared.dto.chat import ChatDtoSave, ChatMemberDtoSave, ChatMemberDtoUpdate
 
 
 class ChatRepository(BaseRepository[Chat]):
     """Репозиторий для работы с чатами"""
     MODEL: type[Chat] = Chat
     CHAT_MEMBER_MODEL: type[ChatMember] = ChatMember
+
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
+        self.MAPPING_DTO_ORM_SAVE.update({
+            ChatDtoSave: Chat,
+            ChatMemberDtoSave: ChatMember
+        })
 
     async def get_chat_by_id(self, chat_id: UUID, with_relation: bool = False) -> Chat:
         """Получение чата по id"""
@@ -76,7 +85,7 @@ class ChatRepository(BaseRepository[Chat]):
         sqla_obj = await self.session.execute(stmt)
         deleted = sqla_obj.scalars().all()
         if not deleted:
-            raise Exception
+            raise RecordNotFound(chat_id, self.MODEL, 'id')
         return len(deleted)
 
     async def update_member(self, chat_id: UUID, user_id: str, update_member: ChatMemberDtoUpdate) -> ChatMember:
@@ -98,7 +107,7 @@ class ChatRepository(BaseRepository[Chat]):
         sqla_obj = await self.session.execute(stmt)
         member_info = sqla_obj.scalar_one_or_none()
         if not member_info:
-            raise Exception
+            raise RecordNotFound(f'чат={chat_id}, user={user_id}', self.MODEL, 'id')
         for k, v in raw_data.items():
             setattr(member_info, k, v)
         return member_info
