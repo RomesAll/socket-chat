@@ -35,6 +35,7 @@ class User(StrIdMixin, Base):
     )
     owned_rooms: Mapped[list['Room']] = relationship(
         back_populates='owner',
+        cascade='all, delete-orphan',
         foreign_keys='Room.owner_id',
     )
 
