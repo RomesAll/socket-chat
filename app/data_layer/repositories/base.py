@@ -7,11 +7,9 @@ from app.shared.dto.room import RoomDtoSave, RoomMemberDtoSave
 from app.shared.dto.user import UserDtoSave, UserDtoInfoSave
 
 TOrmModel = TypeVar('TOrmModel', bound=Base)
-TDtoSave = TypeVar('TDtoSave', bound=BaseModel)
-TDtoUpdate = TypeVar('TDtoUpdate', bound=BaseModel)
 
 
-class BaseRepository(Generic[TOrmModel, TDtoSave, TDtoUpdate]):
+class BaseRepository(Generic[TOrmModel]):
     MODEL: type[Base] = Base
     MAPPING_DTO_ORM_SAVE = {
         RoomDtoSave: Room,
@@ -24,7 +22,23 @@ class BaseRepository(Generic[TOrmModel, TDtoSave, TDtoUpdate]):
         self.session = session
 
     @classmethod
-    def dto_to_orm(cls, dto: TDtoSave) -> TOrmModel:
+    def dto_to_orm(cls, dto: BaseModel) -> TOrmModel:
+        """
+        Конвертация из dto модели в orm объекты с учетом вложенных
+        атрибутов. Обход вложенных атрибутов осуществляется через рекурсию.
+
+        Алгоритм:\n
+        - Проверяем что переданный dto это объект pydantic
+        - С помощью маппинга получаем orm модель для типа pydantic (если нет, то ошибка)
+        - Формирует результирующую коллекцию raw_data
+        - Итерируемся по атрибутам dto
+        - На каждой итерации получаем значение атрибута и проверяем
+        - Если атрибут не коллекция, то просто добавляем как есть в raw_data
+        - Если атрибут коллекция, то для него вызываем нашу функцию рекурсивно и передаем вложенную коллекцию
+        - В результате рекурсивный алгоритм создает orm объект по raw_data и возвращает его вверх по рекурсии
+        :param dto:
+        :return:
+        """
         if not isinstance(dto, BaseModel):
             raise Exception
         model = cls.MAPPING_DTO_ORM_SAVE.get(type(dto), None)
@@ -45,14 +59,16 @@ class BaseRepository(Generic[TOrmModel, TDtoSave, TDtoUpdate]):
         orm_model = model(**raw_data)
         return orm_model
 
-    async def _get(self, relation: set | None = None) -> list[TOrmModel]:
+    async def _get(self, relation: list | None = None) -> list[TOrmModel]:
+        """Получение списка записей из бд"""
         stmt = select(self.MODEL)
         if relation:
             stmt = stmt.options(*relation)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def _get_by_id(self, record_id: Any, relation: set | None = None) -> TOrmModel:
+    async def _get_by_id(self, record_id: Any, relation: list | None = None) -> TOrmModel:
+        """Получение записи по id"""
         stmt = select(self.MODEL).where(self.MODEL.id == record_id)
         if relation:
             stmt = stmt.options(*relation)
@@ -62,13 +78,15 @@ class BaseRepository(Generic[TOrmModel, TDtoSave, TDtoUpdate]):
             raise Exception
         return result
 
-    async def save(self, request: TDtoSave) -> TOrmModel:
+    async def save(self, request: BaseModel) -> TOrmModel:
+        """Сохранение новой записи в бд"""
         orm_model = self.dto_to_orm(request)
         self.session.add(orm_model)
         await self.session.flush()
         return orm_model
 
-    async def update(self, record_id: Any, request: TDtoUpdate) -> TOrmModel:
+    async def update(self, record_id: Any, request: BaseModel) -> TOrmModel:
+        """Обновление существующей записи в бд"""
         record_info = await self._get_by_id(record_id)
         raw_data = request.model_dump(
             exclude_none=True,
@@ -80,6 +98,7 @@ class BaseRepository(Generic[TOrmModel, TDtoSave, TDtoUpdate]):
         return record_info
 
     async def delete(self, record_id: Any) -> TOrmModel:
+        """Удаление записи из бд"""
         record_info = await self._get_by_id(record_id)
         await self.session.delete(record_info)
         return record_info
