@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class RoomRole(str, Enum):
     """Перечисление ролей в комнатах"""
     OWNER = 'owner'
-    ADMIN = 'admins'
+    ADMIN = 'admin'
     MEMBER = 'member'
 
 
@@ -24,8 +24,11 @@ class Room(UuidIsMixin, Base):
     avatar_url: Mapped[str] = mapped_column(default=None, nullable=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey('user.id', ondelete='CASCADE'))
     is_private: Mapped[bool] = mapped_column(default=True)
-    owner: Mapped['User'] = relationship(foreign_keys=[owner_id], back_populates='owned_rooms')
-    members: Mapped[list['RoomMember']] = relationship(back_populates='room', cascade='all, delete-orphan',)
+    owner: Mapped['User'] = relationship(back_populates='owned_rooms')
+    members: Mapped[list['RoomMember']] = relationship(
+        back_populates='room',
+        cascade='all, delete-orphan',
+    )
     chat: Mapped['Chat'] = relationship(back_populates='room')
 
 
