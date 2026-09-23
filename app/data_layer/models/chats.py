@@ -17,7 +17,7 @@ class ChatType(str, Enum):
 
 class Chat(UuidIsMixin, Base):
     """Orm модель для хранения информации о чатах"""
-    type: Mapped[ChatType]
+    name: Mapped[str]
     room_id: Mapped[UUID] = mapped_column(
         ForeignKey('room.id', ondelete='CASCADE'),
         nullable=True,
