@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 from app.data_layer.models import RoleEnum
 
@@ -31,3 +32,15 @@ class UserDtoUpdateExtendedInfo(BaseModel):
     description: str | None = None
     years_old: int | None = None
     role: RoleEnum | None = None
+
+
+class UserInfoCache(BaseModel):
+    """DTO для сохранения инф. о пользователе в кещ"""
+    id: str
+    display_name: str
+    avatar_url: str
+    years_old: int
+    role: RoleEnum
+    email: str
+    created_at: datetime
+    updated_at: datetime
