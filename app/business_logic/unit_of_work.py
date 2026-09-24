@@ -1,5 +1,5 @@
 import asyncio
-from app.data_layer.models.events import OutboxEvent, Status
+from app.data_layer.models.events import OutboxEvent, Status, EventType
 from app.data_layer.repositories import MessageRepository, ChatRepository, RoomRepository, UserRepository
 from mongotic.asyncio import AsyncSession as MongoSession
 from sqlalchemy.ext.asyncio import AsyncSession as SqlAsyncSession
@@ -30,6 +30,13 @@ class UnitOfWork:
             if self.mongo_session:
                 await self.mongo_session.close()
 
+    def add_event(self, event_name: str, payload: object, event_type: EventType):
+        self._events.append({
+            event_name: event_name,
+            payload: payload,
+            event_type: event_type
+        })
+
     async def commit(self):
         """Строгий атомарный коммит в обе базы данных"""
         if not self.mongo_session and self._events:
@@ -38,7 +45,7 @@ class UnitOfWork:
             for event in self._events:
                 event_orm = OutboxEvent(
                     event_name=event["event_name"],
-                    data=event["payload"],
+                    payload=event["payload"],
                     status=Status.NEW,
                     type=event['type']
                 )
