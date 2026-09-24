@@ -653,6 +653,22 @@ yaml = ["PyYAML (>=3.10)"]
 zookeeper = ["kazoo (>=2.8.0)"]
 
 [[package]]
+name = "mongotic"
+version = "0.6.0"
+description = "The concept of MongoDB, SQLAlchemy and Pydantic."
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+files = [
+    {file = "mongotic-0.6.0-py3-none-any.whl", hash = "sha256:1536a280a27e372989a4e833a14554ed16b77d12b332f6dc005d770fd3b24fb0"},
+    {file = "mongotic-0.6.0.tar.gz", hash = "sha256:6fa1ab7392d67a86810a21db14893149ae542d38ab1cc1d32161f539080b9af2"},
+]
+
+[package.dependencies]
+pydantic = ">=2,<3"
+pymongo = ">=4.10,<5"
+
+[[package]]
 name = "packaging"
 version = "26.3"
 description = "Core utilities for Python packages"
@@ -1422,4 +1438,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14"
-content-hash = "4ff4cf330819f15d87f8e49322ccc8053ddf7737db9b4fba8d8c450bee099a4e"
+content-hash = "6ba4d9f129f7ac33d672c279eb0889a4e90c95c1a0766ef64ba4bae9ed170527"
