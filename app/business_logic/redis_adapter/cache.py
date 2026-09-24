@@ -5,7 +5,7 @@ from app.shared.dto.message import MessageDtoGet
 from app.shared.dto.user import UserInfoCache
 
 
-class JWTWhiteListCache:
+class Cache:
     """
     Адаптер для redis кеша. Сохраняет следующую информацию:\n
     1) общая информация о пользователе;
