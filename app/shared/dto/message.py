@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel
 from app.data_layer.models import MessageType
@@ -15,6 +16,14 @@ class MessageDtoSave(BaseModel):
     forwarded_from_user_id: str | None = None
     is_edited: bool = False
     message_file: list[MessageAttachmentDtoSave] | None = None
+
+
+class MessageDtoGet(MessageDtoSave):
+    """DTO для получения сохраненного сообщения"""
+    created_at: datetime
+    updated_at: datetime
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
 
 
 class MessageDtoUpdate(BaseModel):
