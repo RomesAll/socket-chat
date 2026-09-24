@@ -55,3 +55,10 @@ class OrmModelNotFound(Exception):
         self.dto = dto
         self.msg = f'Не удалось найти orm модель по dto, передан тип: {type(dto)}'
         super().__init__(self.msg)
+
+
+class EmailSendError(Exception):
+    def __init__(self, to: str, cause: str):
+        self.to = to
+        self.msg = f'Не удалось отправить сообщение на адрес: {to}, причина {cause}'
+        super().__init__(self.msg)
