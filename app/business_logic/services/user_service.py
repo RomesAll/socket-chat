@@ -157,18 +157,16 @@ class UserService(LogMixin):
     ) -> UserDtoGet:
         """
         Обновление базовой информации пользователя, алгоритм:
-        1) сохраняет старую информацию о пользователя в лог файл;
-        2) сохраняет информацию в бд;
-        5) регистрируется событие UPDATE_USER для последующего аудита;
-        6) сохраняется информация о пользователе в кеш (после успешного commit).
+        1) сохраняет информацию в бд;
+        2) регистрируется событие UPDATE_USER для последующего аудита;
+        3) сохраняется информация о пользователе в кеш (после успешного commit).
         :param user_id: id пользователя
         :param update_user: DTO для хранения атрибутов для обновления
         :return:
         """
         async with self._uow as uow:
-            old_user_info = await uow.user_repo.get_user_by_id(user_id)
             user = await uow.user_repo.update_default_info(user_id, update_user)
-            self.log_info(f'Обновлена информация о пользователе {user.id} с {old_user_info.to_dict()} на {user.to_dict()}')
+            self.log_info(f'Обновлена информация о пользователе {user.id}')
             uow.add_event(
                 event_name='Update user',
                 payload=user.to_dict(),
@@ -184,18 +182,16 @@ class UserService(LogMixin):
     ) -> UserDtoGet:
         """
         Обновление расширенной информации пользователя, алгоритм:
-        1) сохраняет старую информацию о пользователя в лог файл;
-        2) сохраняет информацию в бд;
-        5) регистрируется событие UPDATE_USER для последующего аудита;
-        6) сохраняется информация о пользователе в кеш (после успешного commit).
+        1) сохраняет информацию в бд;
+        2) регистрируется событие UPDATE_USER для последующего аудита;
+        3) сохраняется информация о пользователе в кеш (после успешного commit).
         :param user_id: id пользователя
         :param update_user: DTO для хранения атрибутов для обновления
         :return:
         """
         async with self._uow as uow:
-            old_user_info = await uow.user_repo.get_user_by_id(user_id)
             user = await uow.user_repo.update_extended_info(user_id, update_user)
-            self.log_info(f'Обновлена информация о пользователе {user.id} с {old_user_info.to_dict()} на {user.to_dict()}')
+            self.log_info(f'Обновлена информация о пользователе {user.id}')
             uow.add_event(
                 event_name='Update user',
                 payload=user.to_dict(),
@@ -204,4 +200,26 @@ class UserService(LogMixin):
         is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user.to_dict()))
         if not is_saved:
             self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
+        return UserDtoGet(**user.to_dict())
+
+    async def delete_user(self, user_id: str) -> UserDtoGet:
+        """
+        Удаление информации о пользователе, алгоритм:
+        1) удаляет информацию из бд;
+        2) регистрируется событие DELETE_USER для последующего аудита;
+        3) удаление пользователя из кеша.
+        :param user_id: id пользователя
+        :return:
+        """
+        async with self._uow as uow:
+            user = await uow.user_repo.delete(user_id)
+            self.log_info(f'Удалена информация о пользователе {user.id}')
+            uow.add_event(
+                event_name='Delete user',
+                payload=user.to_dict(),
+                event_type=EventType.DELETE_USER
+            )
+        is_saved = await self._cache.delete_user_info(str(user.id))
+        if not is_saved:
+            self.log_warning(f'Пользователь {user_id} не был удален из кеша')
         return UserDtoGet(**user.to_dict())
