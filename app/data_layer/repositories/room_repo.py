@@ -21,12 +21,12 @@ class RoomRepository(BaseRepository[Room]):
             RoomMemberDtoSave: RoomMember
         })
 
-    async def get_rooms(self, with_relation: bool = False) -> list[Room]:
+    async def get_rooms(self, limit: int, offset: int, with_relation: bool = False) -> list[Room]:
         """Получение списка комнат"""
         options = None
         if with_relation:
             options = self._with_room_options()
-        result = await self._get(options)
+        result = await self._get(limit, offset, options)
         return result
 
     async def get_member_in_room(self, room_id: UUID, with_relation: bool = False) -> list[RoomMember]:

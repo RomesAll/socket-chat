@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import TypeVar, Generic, Any
 from app.data_layer.exceptions import RecordNotFound, OrmModelNotFound
@@ -41,8 +41,11 @@ class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
         if not model:
             raise OrmModelNotFound(dto)
         raw_data = {}
+        model_field_info =  [attr.key for attr in inspect(model).attrs]
         for field in dto.model_fields.keys():
             value = getattr(dto, field)
+            if field not in model_field_info:
+                continue
             if isinstance(value, (list, tuple, set, BaseModel)):
                 orm_nested = None
                 if isinstance(value, BaseModel):
@@ -55,9 +58,13 @@ class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
         orm_model = model(**raw_data)
         return orm_model
 
-    async def _get(self, relation: list | None = None) -> list[TOrmModel]:
+    async def _get(self, limit: int, offset: int, relation: list | None = None) -> list[TOrmModel]:
         """Получение списка записей из бд"""
-        stmt = select(self.MODEL)
+        stmt = (
+            select(self.MODEL)
+            .limit(limit)
+            .offset(offset)
+        )
         if relation:
             stmt = stmt.options(*relation)
         result = await self.session.execute(stmt)

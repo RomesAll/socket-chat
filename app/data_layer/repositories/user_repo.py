@@ -21,12 +21,12 @@ class UserRepository(BaseRepository[User]):
             UserDtoInfoSave: UserInfo
         })
 
-    async def get_users(self, with_relation: bool = False) -> list[User]:
+    async def get_users(self, limit: int, offset: int, with_relation: bool = False) -> list[User]:
         """Получение списка пользователей"""
         options = None
         if with_relation:
             options = self._with_user_options()
-        result = await self._get(options)
+        result = await self._get(limit, offset, options)
         return result
 
     async def get_user_by_id(self, user_id: str, with_relation: bool = False) -> User:
