@@ -1,7 +1,6 @@
 import random
 from app.business_logic.psw_manager import PasswordManager
 from app.business_logic.redis_adapter import VerifyCodeStorage, Cache
-from app.data_layer.models import User
 from app.data_layer.models.events import EventType
 from app.business_logic.unit_of_work import UnitOfWork
 from app.shared.dto import UserDtoSave
@@ -61,7 +60,7 @@ class UserService(LogMixin):
 
     async def _get_user_info(
             self, limit: int, offset: int, with_relation: bool = False
-    ) -> list[User]:
+    ) -> list[dict]:
         """
         Получение информации о пользователях с возможностью получение связных записей
         (relationship)
@@ -87,7 +86,7 @@ class UserService(LogMixin):
         :return: list[UserDtoBriefGet]
         """
         users = await self._get_user_info(limit, offset, with_relation)
-        response = [UserDtoBriefGet(**user.to_dict()) for user in users]
+        response = [UserDtoBriefGet(**user) for user in users]
         return response
 
     async def get_user_extension_info(
@@ -102,6 +101,49 @@ class UserService(LogMixin):
         :return: list[UserDtoGet]
         """
         users = await self._get_user_info(limit, offset, with_relation)
-        response = [UserDtoGet(**user.to_dict()) for user in users]
+        response = [UserDtoGet(**user) for user in users]
         return response
 
+    async def _get_user_by_id(
+            self, user_id: str, with_relation: bool = False
+    ) -> dict:
+        """
+        Получение информации о пользователе с возможностью получение связных записей
+        (relationship)
+        :param user_id: id пользователя
+        :param with_relation: выводить ли связанные записи
+        :return: User
+        """
+        async with self._uow as uow:
+            if not (user := await self._cache.get_user_info(user_id)):
+                user = await uow.user_repo.get_user_by_id(user_id, with_relation)
+                self.log_debug(f'Получение информации о пользователе {user.id}')
+            return user
+
+    async def get_user_by_id_brief_info(
+            self, user_id: str, with_relation: bool = False
+    ) -> UserDtoBriefGet:
+        """
+        Получение краткой информации о пользователе с возможностью получение связных записей
+        (relationship)
+        :param user_id: id пользователя
+        :param with_relation: выводить ли связанные записи
+        :return: UserDtoBriefGet
+        """
+        user = await self._get_user_by_id(user_id, with_relation)
+        response = UserDtoBriefGet(**user)
+        return response
+
+    async def get_user_by_id_extension_info(
+            self, user_id: str, with_relation: bool = False
+    ) -> UserDtoGet:
+        """
+        Получение расширенной информации о пользователе с возможностью получение связных записей
+        (relationship)
+        :param user_id: id пользователя
+        :param with_relation: выводить ли связанные записи
+        :return: UserDtoGet
+        """
+        user = await self._get_user_by_id(user_id, with_relation)
+        response = UserDtoGet(**user)
+        return response
