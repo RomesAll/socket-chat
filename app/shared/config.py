@@ -129,6 +129,8 @@ class TestingConfig(BaseConfig):
     )
 
 
+_config: None | BaseConfig = None
+
 def create_config(mode: AppMode) -> BaseConfig:
     """
     Получение конфигурации приложения по типу режима работы:
@@ -138,12 +140,20 @@ def create_config(mode: AppMode) -> BaseConfig:
     :param mode: объект enum перечисления AppMode
     :return: объект BaseConfig с конфигураций приложения
     """
+    global _config
     match mode:
         case AppMode.DEV:
-            return DevelopConfig()
+            _config = DevelopConfig()
         case AppMode.PROD:
-            return ProductionConfig()
+            _config = ProductionConfig()
         case AppMode.TEST:
-            return TestingConfig()
+            _config = TestingConfig()
         case _:
             raise ValueError(f"Неизвестный режим работы: {mode}, доступны (dev, test, prod)")
+    return get_config()
+
+
+def get_config() -> BaseConfig:
+    if not _config:
+        raise TypeError('Конфиг не был проинициализирован')
+    return _config
