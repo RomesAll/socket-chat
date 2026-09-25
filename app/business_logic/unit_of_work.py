@@ -30,11 +30,11 @@ class UnitOfWork:
             if self.mongo_session:
                 await self.mongo_session.close()
 
-    def add_event(self, event_name: str, payload: object, event_type: EventType):
+    def add_event(self, event_name: str, payload: dict, event_type: EventType):
         self._events.append({
-            event_name: event_name,
-            payload: payload,
-            event_type: event_type
+            'event_name': event_name,
+            'payload': payload,
+            'event_type': event_type
         })
 
     async def commit(self):
