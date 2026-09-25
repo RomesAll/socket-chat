@@ -1,12 +1,15 @@
 import random
 from app.business_logic.psw_manager import PasswordManager
 from app.business_logic.redis_adapter import VerifyCodeStorage, Cache
+from app.data_layer.models import User, UserInfo
 from app.data_layer.models.events import EventType
 from app.business_logic.unit_of_work import UnitOfWork
 from app.shared.dto import UserDtoSave
-from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, RegisterDtoGet
+from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, RegisterDtoGet, UserDtoUpdateDefaultInfo, \
+    UserDtoUpdateExtendedInfo
 from app.shared.log_config import LogMixin
 from app.shared.config import get_config, AppMode
+from collections import deque
 config = get_config()
 
 
@@ -53,14 +56,14 @@ class UserService(LogMixin):
                 self.log_info(f'Событие NEW_USER зарегистрировано для пользователя {new_user.id}')
             else:
                 response.code = code
-        is_saved = await self._cache.save_user_info(user_info=UserDtoBriefGet(**user_orm))
+        is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user_orm))
         if not is_saved:
            self.log_warning(f'Пользователь {new_user.id} не был сохранен в кеше')
         return response
 
-    async def _get_user_info(
+    async def _get_users_info(
             self, limit: int, offset: int, with_relation: bool = False
-    ) -> list[dict]:
+    ) -> list[User]:
         """
         Получение информации о пользователях с возможностью получение связных записей
         (relationship)
@@ -74,7 +77,7 @@ class UserService(LogMixin):
             self.log_debug(f'Получение списка пользователей')
             return users
 
-    async def get_user_brief_info(
+    async def get_users_brief_info(
             self, limit: int, offset: int, with_relation: bool = False
     ) -> list[UserDtoBriefGet]:
         """
@@ -85,11 +88,11 @@ class UserService(LogMixin):
         :param with_relation: выводить ли связанные записи
         :return: list[UserDtoBriefGet]
         """
-        users = await self._get_user_info(limit, offset, with_relation)
-        response = [UserDtoBriefGet(**user) for user in users]
+        users = await self._get_users_info(limit, offset, with_relation)
+        response = [UserDtoBriefGet(**user.to_dict()) for user in users]
         return response
 
-    async def get_user_extension_info(
+    async def get_users_extension_info(
             self, limit: int, offset: int, with_relation: bool = False
     ) -> list[UserDtoGet]:
         """
@@ -100,8 +103,8 @@ class UserService(LogMixin):
         :param with_relation: выводить ли связанные записи
         :return: list[UserDtoGet]
         """
-        users = await self._get_user_info(limit, offset, with_relation)
-        response = [UserDtoGet(**user) for user in users]
+        users = await self._get_users_info(limit, offset, with_relation)
+        response = [UserDtoGet(**user.to_dict()) for user in users]
         return response
 
     async def _get_user_by_id(
@@ -117,6 +120,7 @@ class UserService(LogMixin):
         async with self._uow as uow:
             if not (user := await self._cache.get_user_info(user_id)):
                 user = await uow.user_repo.get_user_by_id(user_id, with_relation)
+                user = user.to_dict()
                 self.log_debug(f'Получение информации о пользователе {user.id}')
             return user
 
@@ -147,3 +151,57 @@ class UserService(LogMixin):
         user = await self._get_user_by_id(user_id, with_relation)
         response = UserDtoGet(**user)
         return response
+
+    async def update_default_info_user(
+            self, user_id, update_user: UserDtoUpdateDefaultInfo
+    ) -> UserDtoGet:
+        """
+        Обновление базовой информации пользователя, алгоритм:
+        1) сохраняет старую информацию о пользователя в лог файл;
+        2) сохраняет информацию в бд;
+        5) регистрируется событие UPDATE_USER для последующего аудита;
+        6) сохраняется информация о пользователе в кеш (после успешного commit).
+        :param user_id: id пользователя
+        :param update_user: DTO для хранения атрибутов для обновления
+        :return:
+        """
+        async with self._uow as uow:
+            old_user_info = await uow.user_repo.get_user_by_id(user_id)
+            user = await uow.user_repo.update_default_info(user_id, update_user)
+            self.log_info(f'Обновлена информация о пользователе {user.id} с {old_user_info.to_dict()} на {user.to_dict()}')
+            uow.add_event(
+                event_name='Update user',
+                payload=user.to_dict(),
+                event_type=EventType.UPDATE_USER
+            )
+        is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user.to_dict()))
+        if not is_saved:
+            self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
+        return UserDtoGet(**user.to_dict())
+
+    async def update_extended_info_user(
+            self, user_id, update_user: UserDtoUpdateExtendedInfo
+    ) -> UserDtoGet:
+        """
+        Обновление расширенной информации пользователя, алгоритм:
+        1) сохраняет старую информацию о пользователя в лог файл;
+        2) сохраняет информацию в бд;
+        5) регистрируется событие UPDATE_USER для последующего аудита;
+        6) сохраняется информация о пользователе в кеш (после успешного commit).
+        :param user_id: id пользователя
+        :param update_user: DTO для хранения атрибутов для обновления
+        :return:
+        """
+        async with self._uow as uow:
+            old_user_info = await uow.user_repo.get_user_by_id(user_id)
+            user = await uow.user_repo.update_extended_info(user_id, update_user)
+            self.log_info(f'Обновлена информация о пользователе {user.id} с {old_user_info.to_dict()} на {user.to_dict()}')
+            uow.add_event(
+                event_name='Update user',
+                payload=user.to_dict(),
+                event_type=EventType.UPDATE_USER
+            )
+        is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user.to_dict()))
+        if not is_saved:
+            self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
+        return UserDtoGet(**user.to_dict())
