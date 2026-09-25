@@ -59,3 +59,11 @@ class SaveSessionKeyError(Exception):
         self.session_id = session_id
         self.msg = f'Не удалось сохранить сессионный ключ {session_id} для пользователя {user_id}'
         super().__init__(self.msg)
+
+
+class SaveCodeError(Exception):
+    """Ошибка сохранения кода подтверждения"""
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        self.msg = f'Не удалось сохранить код подтверждения для пользователя {user_id}'
+        super().__init__(self.msg)
