@@ -1,4 +1,6 @@
 from redis.asyncio import Redis
+
+from app.business_logic.exceptions import ResponseRedisError, SaveCodeError
 from app.business_logic.redis_adapter.exception_handler import exception_handler
 
 
@@ -9,7 +11,7 @@ class VerifyCodeStorage:
         self._prefix = 'verify_code'
 
     @exception_handler(generate_exc=True)
-    async def save(self, user_id: str, code: int, ttl: int = 300) -> bool:
+    async def save(self, user_id: str, code: int, ttl: int = 300):
         """
         Сохранение кода подтверждения для auth и регистрации.
         user_id - идентификатор пользователя
@@ -22,7 +24,8 @@ class VerifyCodeStorage:
             time=ttl,
             value=code
         ))
-        return result
+        if not result:
+            raise SaveCodeError(user_id)
 
     @exception_handler(generate_exc=True)
     async def validate_code(self, user_id: str, code: int) -> bool:
