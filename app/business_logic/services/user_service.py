@@ -1,10 +1,11 @@
 import random
 from app.business_logic.psw_manager import PasswordManager
 from app.business_logic.redis_adapter import VerifyCodeStorage, Cache
+from app.data_layer.models import User
 from app.data_layer.models.events import EventType
 from app.business_logic.unit_of_work import UnitOfWork
 from app.shared.dto import UserDtoSave
-from app.shared.dto.user import UserDtoGet, UserDtoBriefGet
+from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, RegisterDtoGet
 from app.shared.log_config import LogMixin
 from app.shared.config import get_config, AppMode
 config = get_config()
@@ -24,7 +25,7 @@ class UserService(LogMixin):
         self._psw_manager = psw_manager
         self._cache = cache
 
-    async def add_user(self, new_user: UserDtoSave) -> UserDtoGet:
+    async def add_user(self, new_user: UserDtoSave) -> RegisterDtoGet:
         """
         Добавление нового пользователя, алгоритм:
         1) для переданного атрибута new_user.user_info.password высчитывается хеш;
@@ -34,7 +35,7 @@ class UserService(LogMixin):
         5) регистрируется событие NEW_USER для последующей отправки кода на почту;
         6) сохраняется информация о пользователе в кеш (после успешного commit).
         :param new_user: DTO для создания нового пользователя
-        :return:
+        :return: RegisterDtoGet (если режим работы DEV, то код подтверждения будет внутри модели)
         """
         async with self._uow as uow:
             hash_psw = self._psw_manager.hash_password(new_user.user_info.password)
@@ -43,7 +44,7 @@ class UserService(LogMixin):
             self.log_info(f'Пользователь {new_user.id} успешно сохранен в БД')
             code = random.randint(10000, 99999)
             await self._verify_code_storage.save(user_orm.id, code)
-            response = UserDtoGet(**user_orm)
+            response = RegisterDtoGet(**user_orm)
             if config.mode not in (AppMode.DEV, ):
                 uow.add_event(
                     event_name='Save new user',
@@ -51,7 +52,56 @@ class UserService(LogMixin):
                     event_type=EventType.NEW_USER
                 )
                 self.log_info(f'Событие NEW_USER зарегистрировано для пользователя {new_user.id}')
+            else:
+                response.code = code
         is_saved = await self._cache.save_user_info(user_info=UserDtoBriefGet(**user_orm))
         if not is_saved:
            self.log_warning(f'Пользователь {new_user.id} не был сохранен в кеше')
         return response
+
+    async def _get_user_info(
+            self, limit: int, offset: int, with_relation: bool = False
+    ) -> list[User]:
+        """
+        Получение информации о пользователях с возможностью получение связных записей
+        (relationship)
+        :param limit: кол-во записей
+        :param offset: пропуск
+        :param with_relation: выводить ли связанные записи
+        :return: list[UserDtoBriefGet]
+        """
+        async with self._uow as uow:
+            users = await uow.user_repo.get_users(limit, offset, with_relation)
+            self.log_debug(f'Получение списка пользователей')
+            return users
+
+    async def get_user_brief_info(
+            self, limit: int, offset: int, with_relation: bool = False
+    ) -> list[UserDtoBriefGet]:
+        """
+        Получение краткой информации о пользователях с возможностью получение связных записей
+        (relationship)
+        :param limit: кол-во записей
+        :param offset: пропуск
+        :param with_relation: выводить ли связанные записи
+        :return: list[UserDtoBriefGet]
+        """
+        users = await self._get_user_info(limit, offset, with_relation)
+        response = [UserDtoBriefGet(**user.to_dict()) for user in users]
+        return response
+
+    async def get_user_extension_info(
+            self, limit: int, offset: int, with_relation: bool = False
+    ) -> list[UserDtoGet]:
+        """
+        Получение расширенной информации о пользователях с возможностью получение связных записей
+        (relationship)
+        :param limit: кол-во записей
+        :param offset: пропуск
+        :param with_relation: выводить ли связанные записи
+        :return: list[UserDtoGet]
+        """
+        users = await self._get_user_info(limit, offset, with_relation)
+        response = [UserDtoGet(**user.to_dict()) for user in users]
+        return response
+
