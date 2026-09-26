@@ -23,7 +23,8 @@ dependencies = [
     "pydevd-pycharm (>=262.0,<263.0)",
     "aiosqlite (>=0.22.1,<0.23.0)",
     "mongotic (>=0.6.0,<0.7.0)",
-    "bcrypt (>=5.0.0,<6.0.0)"
+    "bcrypt (>=5.0.0,<6.0.0)",
+    "alembic (>=1.20.0,<2.0.0)"
 ]
 
 
