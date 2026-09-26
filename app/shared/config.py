@@ -23,7 +23,7 @@ class PostgresqlSettings(BaseModel):
 
     @property
     def url(self):
-        return (f'postgresql://{self.user}:{self.password.get_secret_value()}'
+        return (f'postgresql+psycopg://{self.user}:{self.password.get_secret_value()}'
                 f'@{self.host}:{self.port}/{self.db}')
 
 
