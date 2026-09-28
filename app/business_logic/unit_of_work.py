@@ -47,7 +47,7 @@ class UnitOfWork:
                     event_name=event["event_name"],
                     payload=event["payload"],
                     status=Status.NEW,
-                    type=event['type']
+                    type=event['event_type']
                 )
                 self.mongo_session.add(event_orm)
         await self.sql_session.commit()
