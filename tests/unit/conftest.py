@@ -6,6 +6,7 @@ from app.shared.dto import UserDtoSave, UserDtoInfoSave
 
 @pytest.fixture(scope='function')
 def uow_mock():
+    """Фикстура для получения mock unit of work паттерна"""
     sql_session_mock = AsyncMock()
     mongo_session_mock = AsyncMock()
     uow = UnitOfWork(sql_session_mock, mongo_session_mock)
@@ -18,6 +19,7 @@ def uow_mock():
 
 @pytest.fixture(scope='function')
 def new_user_dto():
+    """Фикстура для получения dto модели для сохранения пользователя"""
     new_user_dto = UserDtoSave(
         id='RomanId',
         display_name='Роман',
