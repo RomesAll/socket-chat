@@ -7,7 +7,7 @@ from contextlib import nullcontext
 
 @pytest.mark.asyncio
 async def test_get_by_id_success(room_repo, default_room):
-    """Тест получение пользователя по id"""
+    """Тест для получения комнаты по id"""
     room = await room_repo.get_room_by_id(default_room.id)
     assert room.id == default_room.id
     assert room.name == default_room.name
@@ -15,7 +15,7 @@ async def test_get_by_id_success(room_repo, default_room):
 
 @pytest.mark.asyncio
 async def test_get_by_id_not_found(room_repo):
-    """Тест получение несуществующего пользователя по id"""
+    """Тест для получения несуществующей комнаты по id"""
     random_id = uuid4()
     with pytest.raises(RecordNotFound) as exc_info:
         await room_repo.get_room_by_id(random_id)
@@ -24,7 +24,7 @@ async def test_get_by_id_not_found(room_repo):
 
 @pytest.mark.asyncio
 async def test_get_success(room_repo, default_room):
-    """Тест получение пользователей"""
+    """Тест для получения комнаты"""
     rooms = await room_repo.get_rooms(limit=1, offset=0)
     assert type(rooms) == list
     assert len(rooms) == 1
@@ -40,7 +40,7 @@ async def test_get_success(room_repo, default_room):
     ],
 )
 async def test_save(room_repo, default_user, name, expected_context):
-    """Тест получение пользователей"""
+    """Тест для сохранения сообщения"""
     room_id = uuid4()
     request = RoomDtoSave(
         id=room_id,
@@ -60,7 +60,7 @@ async def test_save(room_repo, default_user, name, expected_context):
 
 @pytest.mark.asyncio
 async def test_update_success(room_repo, default_room):
-    """Тест получение пользователей"""
+    """Тест для обновления сообщения"""
     room_name = 'UpdateRoom'
     update_data = RoomDtoUpdate(
         name=room_name
@@ -70,7 +70,7 @@ async def test_update_success(room_repo, default_room):
 
 
 async def test_delete_success(room_repo, default_room, default_user):
-    """Тест получение пользователей"""
+    """Тест для удаления сообщения"""
     room_id = uuid4()
     new_room = RoomDtoSave(
         id=room_id,

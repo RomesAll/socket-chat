@@ -6,7 +6,7 @@ from contextlib import nullcontext
 
 @pytest.mark.asyncio
 async def test_get_by_id_success(user_repo, default_user):
-    """Тест получение пользователя по id"""
+    """Тест для получения пользователя по id"""
     user = await user_repo.get_user_by_id(default_user.id)
     assert user.id == default_user.id
     assert user.display_name == default_user.display_name
@@ -14,7 +14,7 @@ async def test_get_by_id_success(user_repo, default_user):
 
 @pytest.mark.asyncio
 async def test_get_by_id_not_found(user_repo):
-    """Тест получение несуществующего пользователя по id"""
+    """Тест для получения несуществующего пользователя по id"""
     random_id = 'User1'
     with pytest.raises(RecordNotFound) as exc_info:
         await user_repo.get_user_by_id(random_id)
@@ -23,7 +23,7 @@ async def test_get_by_id_not_found(user_repo):
 
 @pytest.mark.asyncio
 async def test_get_success(user_repo, default_user):
-    """Тест получение пользователей"""
+    """Тест для получения пользователей"""
     users = await user_repo.get_users(limit=1, offset=0)
     assert type(users) == list
     assert len(users) == 1
@@ -42,7 +42,7 @@ async def test_get_success(user_repo, default_user):
     ]
 )
 async def test_save(user_repo, user_id, display_name, years_old, email, password, expected_context):
-    """Тест получение пользователей"""
+    """Тест для сохранения пользователей"""
     request = UserDtoSave(
         id=user_id,
         display_name=display_name,
@@ -63,7 +63,7 @@ async def test_save(user_repo, user_id, display_name, years_old, email, password
 
 @pytest.mark.asyncio
 async def test_update_success(user_repo, default_user):
-    """Тест получение пользователей"""
+    """Тест для обновления пользователей"""
     display_name = 'update'
     avatar_url = '/home/1.txt'
     update_data = UserDtoUpdateDefaultInfo(
@@ -76,7 +76,7 @@ async def test_update_success(user_repo, default_user):
 
 
 async def test_delete_success(user_repo):
-    """Тест получение пользователей"""
+    """Тест для удаления пользователей"""
     new_user = UserDtoSave(
         id='Petr',
         display_name='Петр',

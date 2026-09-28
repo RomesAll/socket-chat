@@ -6,14 +6,14 @@ from app.shared.dto import ChatDtoSave, ChatDtoUpdate, ChatMemberDtoSave
 
 @pytest.mark.asyncio
 async def test_get_by_id_success(chat_repo, default_chat):
-    """Тест получение пользователя по id"""
+    """Тест для получения чата по id"""
     chat = await chat_repo.get_chat_by_id(default_chat.id)
     assert chat.id == default_chat.id
 
 
 @pytest.mark.asyncio
 async def test_get_by_id_not_found(chat_repo):
-    """Тест получение несуществующего пользователя по id"""
+    """Тест для получения несуществующего чата по id"""
     random_id = uuid4()
     with pytest.raises(RecordNotFound) as exc_info:
         await chat_repo.get_chat_by_id(random_id)
@@ -22,7 +22,7 @@ async def test_get_by_id_not_found(chat_repo):
 
 @pytest.mark.asyncio
 async def test_save(chat_repo, default_room, default_user):
-    """Тест получение пользователей"""
+    """Тест для сохранения чатов"""
     chat_id = uuid4()
     request = ChatDtoSave(
         id=chat_id,
@@ -38,7 +38,7 @@ async def test_save(chat_repo, default_room, default_user):
 
 @pytest.mark.asyncio
 async def test_update_success(chat_repo, default_chat):
-    """Тест получение пользователей"""
+    """Тест для обновления чата"""
     chat_name = 'UpdateChat'
     update_data = ChatDtoUpdate(
         name=chat_name,
@@ -48,7 +48,7 @@ async def test_update_success(chat_repo, default_chat):
 
 
 async def test_delete_success(chat_repo, default_room, default_user):
-    """Тест получение пользователей"""
+    """Тест для удаления чата"""
     chat_id = uuid4()
     new_chat = ChatDtoSave(
         id=chat_id,
