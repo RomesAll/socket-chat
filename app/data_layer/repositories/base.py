@@ -44,7 +44,7 @@ class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
         model_field_info =  [attr.key for attr in inspect(model).attrs]
         for field in dto.model_fields.keys():
             value = getattr(dto, field)
-            if field not in model_field_info:
+            if field not in model_field_info or value is None:
                 continue
             if isinstance(value, (list, tuple, set, BaseModel)):
                 orm_nested = None
