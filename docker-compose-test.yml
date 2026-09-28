@@ -40,12 +40,12 @@ services:
     container_name: pgadmin_panel_test
     restart: always
     ports:
-      - "5045:80"
+      - "5049:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     depends_on:
-      - postgres
+      - postgres_test
 
   mongodb_test:
     image: mongo:latest
