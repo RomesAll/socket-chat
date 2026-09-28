@@ -8,9 +8,9 @@ BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 
 class AppMode(str, Enum):
     """Enum перечисление режимов работы программы"""
-    DEV = 'dev'
-    TEST = 'test'
-    PROD = 'prod'
+    DEV = 'DEV'
+    TEST = 'TEST'
+    PROD = 'PROD'
 
 
 class PostgresqlSettings(BaseModel):
