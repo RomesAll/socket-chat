@@ -1,5 +1,6 @@
 import asyncio, os
 from logging.config import fileConfig
+# import alembic_postgresql_enum
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -11,12 +12,16 @@ from app.shared.config import AppMode, create_config
 from app.data_layer.models import Base
 
 
-mode_env = os.getenv('CHAT_APP_MODE', 'DEV').upper()
+mode_env = os.getenv('CHAT_APP_MODE', None)
+
+if not mode_env:
+    raise ValueError(f"Переменная env CHAT_APP_MODE не установлена")
 
 try:
     current_mode = AppMode(mode_env)
+    print(f'Для alembic миграция был выбран mode {current_mode.value}')
 except KeyError:
-    raise ValueError(f"Некорректный APP_MODE='{mode_env}'. Допустимые значения: DEV, PROD, TEST")
+    raise ValueError(f"Некорректный CHAT_APP_MODE='{mode_env}'. Допустимые значения: DEV, PROD, TEST")
 
 app_config = create_config(current_mode)
 

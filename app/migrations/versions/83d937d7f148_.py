@@ -1,18 +1,18 @@
 """empty message
 
-Revision ID: 0ccd21bf5252
+Revision ID: 83d937d7f148
 Revises: 
-Create Date: 2026-09-26 16:42:21.301015
+Create Date: 2026-09-27 15:30:14.240438
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '0ccd21bf5252'
+revision: str = '83d937d7f148'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -45,7 +45,7 @@ def upgrade() -> None:
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('years_old', sa.Integer(), nullable=True),
-    sa.Column('role', sa.Enum('DEFAULT_USER', 'ADMIN', 'SUPER_ADMIN', name='roleenum'), nullable=False),
+    sa.Column('role', postgresql.ENUM('DEFAULT_USER', 'ADMIN', 'SUPER_ADMIN', name='roleenum', create_type=False), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('password', sa.LargeBinary(length=60), nullable=False),
     sa.Column('last_seen_at', sa.DateTime(), nullable=True),
@@ -67,7 +67,7 @@ def upgrade() -> None:
     op.create_table('room_member',
     sa.Column('room_id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.String(), nullable=False),
-    sa.Column('role', sa.Enum('OWNER', 'ADMIN', 'MEMBER', name='roomrole'), nullable=False),
+    sa.Column('role', postgresql.ENUM('OWNER', 'ADMIN', 'MEMBER', name='roomrole', create_type=False), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['room_id'], ['room.id'], ondelete='CASCADE'),
@@ -89,7 +89,7 @@ def upgrade() -> None:
     sa.Column('chat_id', sa.Uuid(), nullable=False),
     sa.Column('sender_id', sa.String(), nullable=False),
     sa.Column('body_encrypted', sa.String(), nullable=False),
-    sa.Column('type', sa.Enum('TEXT', 'FILE', 'SYSTEM', 'TEXT_AND_FILE', name='messagetype'), nullable=False),
+    sa.Column('type', postgresql.ENUM('TEXT', 'FILE', 'SYSTEM', 'TEXT_AND_FILE', name='messagetype', create_type=False), nullable=False),
     sa.Column('reply_to_message_id', sa.Uuid(), nullable=True),
     sa.Column('forwarded_from_message_id', sa.Uuid(), nullable=True),
     sa.Column('forwarded_from_user_id', sa.String(), nullable=True),
