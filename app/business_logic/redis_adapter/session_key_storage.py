@@ -1,7 +1,6 @@
 from uuid import UUID
 from redis.asyncio import Redis
 from app.business_logic.exceptions import SessionKeyNotFound, SaveSessionKeyError
-from app.business_logic.redis_adapter.base import BaseRedisAdapter
 from app.business_logic.redis_adapter.exception_handler import exception_handler
 
 
