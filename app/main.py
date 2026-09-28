@@ -6,13 +6,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Запуск приложения с выбором конфигурации'
     )
-    env_mode = os.getenv("CHAT_APP_MODE", "dev").lower()
+    env_mode = os.getenv("CHAT_APP_MODE", "DEV")
     parser.add_argument(
         '-m', '--mode',
         type=AppMode,
         required=False,
         default=env_mode,
-        choices=['dev', 'prod', 'test'],
+        choices=['DEV', 'PROD', 'TEST'],
         help='Режим работы приложения (по умолчанию: dev)'
     )
     try:

@@ -2,7 +2,6 @@ from uuid import UUID
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.shared.dto.room import RoomDtoUpdate, RoomMemberDtoSave, RoomDtoSave
@@ -71,7 +70,7 @@ class RoomRepository(BaseRepository[Room]):
         sqla_obj = await self.session.execute(stmt)
         member = sqla_obj.scalar_one_or_none()
         if not member:
-            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL, 'id')
+            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL.__tablename__, 'id')
         member.role = new_role
         return member
 

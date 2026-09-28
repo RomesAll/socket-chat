@@ -78,7 +78,7 @@ class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
         sqla_obj = await self.session.execute(stmt)
         result = sqla_obj.scalar_one_or_none()
         if not result:
-            raise RecordNotFound(record_id, self.MODEL, 'id')
+            raise RecordNotFound(record_id, self.MODEL.__tablename__, 'id')
         return result
 
     async def save(self, request: BaseModel) -> TOrmModel:
