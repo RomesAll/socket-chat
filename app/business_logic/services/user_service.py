@@ -46,17 +46,18 @@ class UserService(LogMixin):
             self.log_info(f'Пользователь {new_user.id} успешно сохранен в БД')
             code = random.randint(10000, 99999)
             await self._verify_code_storage.save(user_orm.id, code)
-            response = RegisterDtoGet(**user_orm)
+            response = RegisterDtoGet(**user_orm.to_dict_without_nested_attr())
             if config.mode not in (AppMode.DEV, ):
                 uow.add_event(
                     event_name='Save new user',
-                    payload=response,
+                    payload=response.model_dump(),
                     event_type=EventType.NEW_USER
                 )
                 self.log_info(f'Событие NEW_USER зарегистрировано для пользователя {new_user.id}')
             else:
                 response.code = code
-        is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user_orm))
+        cache_data = UserDtoGet.model_dump(response)
+        is_saved = await self._cache.save_user_info(user_info=cache_data)
         if not is_saved:
            self.log_warning(f'Пользователь {new_user.id} не был сохранен в кеше')
         return response
@@ -89,7 +90,10 @@ class UserService(LogMixin):
         :return: list[UserDtoBriefGet]
         """
         users = await self._get_users_info(limit, offset, with_relation)
-        response = [UserDtoBriefGet(**user.to_dict()) for user in users]
+        response = [
+            UserDtoBriefGet(**user.to_dict_without_nested_attr())
+            for user in users
+        ]
         return response
 
     async def get_users_extension_info(
@@ -104,7 +108,10 @@ class UserService(LogMixin):
         :return: list[UserDtoGet]
         """
         users = await self._get_users_info(limit, offset, with_relation)
-        response = [UserDtoGet(**user.to_dict()) for user in users]
+        response = [
+            UserDtoGet(**user.to_dict_without_nested_attr())
+            for user in users
+        ]
         return response
 
     async def _get_user_by_id(
@@ -119,9 +126,9 @@ class UserService(LogMixin):
         """
         async with self._uow as uow:
             if not (user := await self._cache.get_user_info(user_id)):
-                user = await uow.user_repo.get_user_by_id(user_id, with_relation)
-                user = user.to_dict()
-                self.log_debug(f'Получение информации о пользователе {user.id}')
+                user = await uow.user_repo.get_user_by_id(user_id, with_relation).to
+                user = user.to_dict_without_nested_attr()
+                self.log_debug(f'Получение информации о пользователе {user['id']}')
             return user
 
     async def get_user_by_id_brief_info(
@@ -135,7 +142,7 @@ class UserService(LogMixin):
         :return: UserDtoBriefGet
         """
         user = await self._get_user_by_id(user_id, with_relation)
-        response = UserDtoBriefGet(**user)
+        response = UserDtoGet(**user)
         return response
 
     async def get_user_by_id_extension_info(
@@ -169,13 +176,14 @@ class UserService(LogMixin):
             self.log_info(f'Обновлена информация о пользователе {user.id}')
             uow.add_event(
                 event_name='Update user',
-                payload=user.to_dict(),
+                payload=user.to_dict_without_nested_attr(),
                 event_type=EventType.UPDATE_USER
             )
-        is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user.to_dict()))
+        user_dto_response = UserDtoGet(**user.to_dict_without_nested_attr())
+        is_saved = await self._cache.save_user_info(user_info=user_dto_response)
         if not is_saved:
             self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
-        return UserDtoGet(**user.to_dict())
+        return user_dto_response
 
     async def update_extended_info_user(
             self, user_id, update_user: UserDtoUpdateExtendedInfo
@@ -194,13 +202,14 @@ class UserService(LogMixin):
             self.log_info(f'Обновлена информация о пользователе {user.id}')
             uow.add_event(
                 event_name='Update user',
-                payload=user.to_dict(),
+                payload=user.to_dict_without_nested_attr(),
                 event_type=EventType.UPDATE_USER
             )
-        is_saved = await self._cache.save_user_info(user_info=UserDtoGet(**user.to_dict()))
+        user_dto_response = UserDtoGet(**user.to_dict_without_nested_attr())
+        is_saved = await self._cache.save_user_info(user_info=user_dto_response)
         if not is_saved:
             self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
-        return UserDtoGet(**user.to_dict())
+        return user_dto_response
 
     async def delete_user(self, user_id: str) -> UserDtoGet:
         """
@@ -216,10 +225,10 @@ class UserService(LogMixin):
             self.log_info(f'Удалена информация о пользователе {user.id}')
             uow.add_event(
                 event_name='Delete user',
-                payload=user.to_dict(),
+                payload=user.to_dict_without_nested_attr(),
                 event_type=EventType.DELETE_USER
             )
         is_saved = await self._cache.delete_user_info(str(user.id))
         if not is_saved:
             self.log_warning(f'Пользователь {user_id} не был удален из кеша')
-        return UserDtoGet(**user.to_dict())
+        return UserDtoGet(**user.to_dict_without_nested_attr())
