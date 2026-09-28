@@ -77,7 +77,7 @@ async def default_room(sql_session, default_user) -> Room:
         description='',
         owner_id=default_user.id,
     )
-    await sql_session.add(room)
+    sql_session.add(room)
     return room
 
 
@@ -92,5 +92,5 @@ async def default_message(sql_session, default_user, default_chat) -> Message:
         body_encrypted='hello world',
         type=MessageType.TEXT,
     )
-    await sql_session.add(message)
+    sql_session.add(message)
     return message
