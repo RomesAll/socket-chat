@@ -62,3 +62,12 @@ class UserConnectionManager:
             if not ws_chats:
                 self._ws_chats.pop(ws, None)
 
+    def leave_all_chats(self, ws: WebSocket):
+        """Отписать соединение от всех чатов"""
+        for chat_id in self._ws_chats.pop(ws, set()):
+            chat_ws = self._chats.get(chat_id)
+            if chat_ws:
+                chat_ws.discard(ws)
+                if not chat_ws:
+                    self._chats.pop(chat_id, None)
+
