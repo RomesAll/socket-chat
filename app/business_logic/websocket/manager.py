@@ -1,0 +1,46 @@
+import asyncio
+from uuid import UUID
+from starlette.websockets import WebSocketState, WebSocket
+
+
+class UserConnectionManager:
+    """
+    Класс менеджер для управления подключениями пользователей
+    """
+    def __init__(self):
+        self.active_session: dict[str, dict[UUID, WebSocket]] = {}
+        self._ws_user_session: dict[WebSocket, tuple[str, UUID]] = {}
+        self._chats: dict[UUID, set[WebSocket]] = {}
+        self._ws_chats: dict[WebSocket, set[UUID]] = {}
+
+    async def connection(self, ws: WebSocket, user_id: str, session_id: UUID):
+        """Принятие и регистрация соединений"""
+        await ws.accept()
+        self.active_session.setdefault(user_id, {})[session_id] = ws
+        self._ws_user_session[ws] = (user_id, session_id)
+
+    async def disconnect(self, ws: WebSocket):
+        """Отключение соединения клиента"""
+        user_id, user_session = self._ws_user_session.pop(ws, (None, None))
+        if not user_id or not user_session:
+            return None
+        user_sessions = self.active_session.get(user_id)
+        if user_sessions:
+            user_sessions.pop(user_session, None)
+            if not user_sessions:
+                self.active_session.pop(user_id, None)
+
+        for chat_id in self._ws_chats.pop(ws, set()):
+            chat_ws: set[WebSocket] | None = self._chats.get(chat_id)
+            if chat_ws:
+                chat_ws.discard(ws)
+                if not chat_ws:
+                    self._chats.pop(chat_id, None)
+
+        try:
+            if ws.client_state != WebSocketState.DISCONNECTED:
+                await ws.close()
+        except Exception:
+            pass
+
+        return None
