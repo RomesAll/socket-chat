@@ -121,3 +121,22 @@ class UserConnectionManager:
                 count_send += 1
         return count_send
 
+    def is_online(self, user_id: str) -> bool:
+        """Есть ли у пользователя активные соединения в текущем воркере"""
+        return bool(self.active_session.get(user_id))
+
+    def sessions_of(self, user_id: str) -> dict[UUID, WebSocket]:
+        """Получить ws и связанные с ними id session"""
+        return dict(self.active_session.get(user_id, {}))
+
+    def chats_of(self, ws: WebSocket) -> set[UUID]:
+        """Получить все чаты в которых есть ws соединение"""
+        return set(self._ws_chats.get(ws, set()))
+
+    def members_of(self, chat_id: UUID) -> set[WebSocket]:
+        """ws, подписанные на чат в текущем воркере"""
+        return set(self._chats.get(chat_id, set()))
+
+    def online_users(self) -> set[str]:
+        """Множество активных ws соединений"""
+        return set(self.active_session.keys())
