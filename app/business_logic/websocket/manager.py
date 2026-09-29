@@ -71,3 +71,26 @@ class UserConnectionManager:
                 if not chat_ws:
                     self._chats.pop(chat_id, None)
 
+
+    async def _send_message(self, ws: WebSocket, payload: dict) -> bool:
+        """Отправить сообщение, если произошла ошибка, то отключить сокет."""
+        try:
+            await ws.send_json(payload)
+            return True
+        except Exception:
+            await self.disconnect(ws)
+            return False
+
+    async def send_to_chat(self, chat_id: UUID, payload: dict) -> int:
+        """
+        Отправить сообщение пользователям ws, подписанным на чат
+        :param chat_id: id пользователей
+        :param payload: тело сообщения
+        :return: кол-во отправленных сообщений
+        """
+        ws_connections = list(self._chats.get(chat_id, ()))
+        count_send = 0
+        for ws in ws_connections:
+            if await self._send_message(ws, payload):
+                count_send += 1
+        return count_send
