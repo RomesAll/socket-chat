@@ -1,4 +1,3 @@
-import asyncio
 from uuid import UUID
 from starlette.websockets import WebSocketState, WebSocket
 
@@ -71,7 +70,6 @@ class UserConnectionManager:
                 if not chat_ws:
                     self._chats.pop(chat_id, None)
 
-
     async def _send_message(self, ws: WebSocket, payload: dict) -> bool:
         """Отправить сообщение, если произошла ошибка, то отключить сокет."""
         try:
@@ -94,3 +92,32 @@ class UserConnectionManager:
             if await self._send_message(ws, payload):
                 count_send += 1
         return count_send
+
+    async def send_to_user(self, user_id: str, payload: dict) -> int:
+        """Отправить сообщение во все сессии пользователя"""
+        sessions = list(self.active_session.get(user_id, {}).values())
+        count_send = 0
+        for ws in sessions:
+            if await self._send_message(ws, payload):
+                count_send += 1
+        return count_send
+
+    async def send_to_session(self, user_id: str, session_id: UUID, payload: dict) -> bool:
+        """Отправить сообщение в конкретную сессию пользователя"""
+        sessions = self.active_session.get(user_id)
+        if not sessions:
+            return False
+        ws = sessions.get(session_id)
+        if ws is None:
+            return False
+        return await self._send_message(ws, payload)
+
+    async def broadcast(self, payload: dict) -> int:
+        """Отправить сообщение всем соединениям"""
+        connections = list(self._ws_user_session.keys())
+        count_send = 0
+        for ws in connections:
+            if await self._send_message(ws, payload):
+                count_send += 1
+        return count_send
+
