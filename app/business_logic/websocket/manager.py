@@ -43,4 +43,22 @@ class UserConnectionManager:
         except Exception:
             pass
 
-        return None
+    def join_in_chat(self, ws: WebSocket, chat_id: UUID):
+        """Добавить сокет в чат"""
+        self._chats.setdefault(chat_id, set()).add(ws)
+        self._ws_chats.setdefault(ws, set()).add(chat_id)
+
+    def leave_chat(self, ws: WebSocket, chat_id: UUID):
+        """Отписать сокет от чата"""
+        chat_ws = self._chats.get(chat_id)
+        if chat_ws:
+            chat_ws.discard(ws)
+            if not chat_ws:
+                self._chats.pop(chat_id, None)
+
+        ws_chats = self._ws_chats.get(ws)
+        if ws_chats:
+            ws_chats.discard(chat_id)
+            if not ws_chats:
+                self._ws_chats.pop(ws, None)
+
