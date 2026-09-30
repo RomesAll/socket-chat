@@ -4,6 +4,7 @@ from uuid import UUID
 from redis.asyncio import Redis
 from app.business_logic.redis_adapter.exception_handler import exception_handler
 from app.shared.dto.message import MessageDtoGet
+from app.shared.dto.room import RoomDtoGet
 from app.shared.dto.user import UserDtoGet
 
 
@@ -22,12 +23,36 @@ class Cache:
         self._chat_msg = 'chat_msg'
         self._user_is_online = 'user_is_online'
         self._user_count_msg_unread = 'user_count_msg_unread'
+        self._room_info = 'room_info'
+
+    @exception_handler(generate_exc=False)
+    async def save_room(self, room_info: RoomDtoGet, ttl_seconds: int = 3600) -> bool:
+        """Сохранение информации о комнате в кеш"""
+        key = f'{self._room_info}:{room_info.id}'
+        save_room_info = room_info.model_dump(
+            mode='json',
+            exclude_none=True,
+            exclude_unset=True,
+        )
+        result = await self.client.hset(key, mapping=save_room_info)
+        await self.client.expire(key, ttl_seconds)
+        return bool(result)
+
+    @exception_handler(generate_exc=False)
+    async def delete_room_info(self, room_id: UUID):
+        """Удаление информации о комнате из кеша"""
+        key = f'{self._room_info}:{room_id}'
+        await self.client.delete(key)
 
     @exception_handler(generate_exc=False)
     async def save_user_info(self, user_info: UserDtoGet, ttl_seconds: int = 3600) -> bool:
         """Сохранение информации о пользователе в кеш"""
         key = f'{self._user_info_prefix}:{user_info.id}'
-        save_user_info = user_info.model_dump(mode='json', exclude_none=True, exclude_unset=True)
+        save_user_info = user_info.model_dump(
+            mode='json',
+            exclude_none=True,
+            exclude_unset=True,
+        )
         result = await self.client.hset(key, mapping=save_user_info)
         await self.client.expire(key, ttl_seconds)
         return bool(result)
@@ -37,6 +62,15 @@ class Cache:
         """Удаление информации о пользователе в кеш"""
         key = f'{self._user_info_prefix}:{str(user_id)}'
         await self.client.delete(key)
+
+    @exception_handler(generate_exc=False)
+    async def get_room_info(self, room_id: UUID) -> dict | None:
+        """Получение информации о пользователе из кеша"""
+        key = f'{self._room_info}:{room_id}'
+        result = await self.client.hgetall(key)
+        if not result:
+            return None
+        return result
 
     @exception_handler(generate_exc=False)
     async def get_user_info(self, user_id: str) -> dict | None:
