@@ -1,6 +1,6 @@
 from uuid import uuid4
 import pytest
-from app.business_logic.jwt_manager import JWTAccessManager, JWTRefreshManager, JWTFacade
+from app.business_logic.jwt_manager import JWTAccessManager, JWTRefreshManager
 from app.data_layer.models import RoleEnum
 from app.shared.dto.jwt import JWTAccessToken, JWTRefreshToken
 

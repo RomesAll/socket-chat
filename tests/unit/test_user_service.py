@@ -27,7 +27,7 @@ async def test_add_user(uow_mock, default_user_orm, save_user_dto):
     uow_mock.user_repo.save.assert_called_once()
 
     assert user_dto_result.id == save_user_dto.id
-    assert user_dto_result.email == save_user_dto.user_info.email
+    assert user_dto_result.user_info.email == save_user_dto.user_info.email
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_get_users_extension_info(uow_mock, default_user_orm):
         verify_code_storage=verify_code_storage,
         psw_manager=PasswordManager,
         cache=cache
-    ).get_users_extension_info(limit=1, offset=0)
+    ).get_users_ext_info(limit=1, offset=0)
 
     uow_mock.user_repo.get_users.assert_called_once()
     assert user_dto_result[0].id == default_user_orm.id
