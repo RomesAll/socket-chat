@@ -52,6 +52,21 @@ class RoomRepository(BaseRepository[Room]):
         await self.session.flush()
         return orm_model
 
+    async def remove_member_in_room(self, room_id: UUID, user_id: str) -> RoomMember:
+        """Удаление участника из комнаты"""
+        stmt = (
+            select(self.ROOM_MEMBER_MODEL)
+            .where(
+                self.ROOM_MEMBER_MODEL.room_id == room_id,
+                self.ROOM_MEMBER_MODEL.user_id == user_id
+            )
+        )
+        sqla_obj = await self.session.execute(stmt)
+        room_member = sqla_obj.scalar_one_or_none()
+        if not room_member:
+            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL.__tablename__, 'id')
+        return room_member
+
     async def update_room(self, room_id: UUID, update_room: RoomDtoUpdate) -> Room:
         """Обновление информации о комнате"""
         result = await self.update(room_id, update_room)
@@ -79,7 +94,7 @@ class RoomRepository(BaseRepository[Room]):
         return [
             joinedload(self.MODEL.owner),
             selectinload(self.MODEL.members),
-            joinedload(self.MODEL.chat)
+            selectinload(self.MODEL.chats)
         ]
 
     def _with_room_member_options(self):
