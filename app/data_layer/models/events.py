@@ -12,6 +12,13 @@ class EventType(str, Enum):
     NEW_USER = 'new_user'
     UPDATE_USER = 'update_user'
     DELETE_USER = 'delete_user'
+    NEW_ROOM = 'new_room'
+    ADD_MEMBER_IN_ROOM = 'add_member_in_room'
+    REMOVE_MEMBER_IN_ROOM = 'remove_member_in_room'
+    REMOVE_ROOM = 'remove_room'
+    ADD_MEMBER_IN_CHAT = 'add_member_in_chat'
+    REMOVE_MEMBER_IN_CHAT = 'remove_member_in_chat'
+    NEW_MESSAGE = 'new_message'
 
 
 class Status(str, Enum):
