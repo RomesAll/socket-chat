@@ -96,3 +96,46 @@ class WSBroker:
                 sessions = self.manager.active_session.get(target['user_id'], {})
                 for ws in sessions.values():
                     self.manager.leave_chat(ws, UUID(target['chat_id']))
+
+    async def _publish(self, package: dict):
+        await self.redis.publish(self.CHANNEL, json.dumps(package))
+
+    async def publish_to_chat(self, chat_id: UUID, payload: dict):
+        await self._publish({
+            'target': {'type_message': 'chat', 'chat_id': str(chat_id)},
+            'payload': payload,
+        })
+
+    async def publish_to_user(self, user_id: str, payload: dict):
+        await self._publish({
+            'target': {'type_message': 'user', 'user_id': user_id},
+            'payload': payload,
+        })
+
+    async def publish_to_session(self, user_id: str, session_id: UUID, payload: dict):
+        await self._publish({
+            'target': {
+                'type_message': 'session',
+                'user_id': user_id,
+                'session_id': str(session_id),
+            },
+            'payload': payload,
+        })
+
+    async def publish_broadcast(self, payload: dict):
+        await self._publish({
+            'target': {'type_message': 'broadcast'},
+            'payload': payload,
+        })
+
+    async def publish_join_chat(self, chat_id: UUID, user_id: str):
+        await self._publish({
+            'target': {'type_message': 'join_chat', 'chat_id': str(chat_id), 'user_id': user_id},
+            'payload': {},
+        })
+
+    async def publish_leave_chat(self, chat_id: UUID, user_id: str):
+        await self._publish({
+            'target': {'type_message': 'leave_chat', 'chat_id': str(chat_id), 'user_id': user_id},
+            'payload': {},
+        })
