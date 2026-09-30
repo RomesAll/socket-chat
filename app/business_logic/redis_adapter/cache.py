@@ -29,13 +29,11 @@ class Cache:
     async def save_room(self, room_info: RoomDtoGet, ttl_seconds: int = 3600) -> bool:
         """Сохранение информации о комнате в кеш"""
         key = f'{self._room_info}:{room_info.id}'
-        save_room_info = room_info.model_dump(
-            mode='json',
-            exclude_none=True,
-            exclude_unset=True,
+        save_room_info = json.dumps(
+            room_info.model_dump(mode='json', exclude_none=True),
+            ensure_ascii=False
         )
-        result = await self.client.hset(key, mapping=save_room_info)
-        await self.client.expire(key, ttl_seconds)
+        result = await self.client.setex(key, ttl_seconds, save_room_info)
         return bool(result)
 
     @exception_handler(generate_exc=False)
@@ -48,13 +46,11 @@ class Cache:
     async def save_user_info(self, user_info: UserDtoGet, ttl_seconds: int = 3600) -> bool:
         """Сохранение информации о пользователе в кеш"""
         key = f'{self._user_info_prefix}:{user_info.id}'
-        save_user_info = user_info.model_dump(
-            mode='json',
-            exclude_none=True,
-            exclude_unset=True,
+        save_user_info = json.dumps(
+            user_info.model_dump(mode='json', exclude_none=True),
+            ensure_ascii=False
         )
-        result = await self.client.hset(key, mapping=save_user_info)
-        await self.client.expire(key, ttl_seconds)
+        result = await self.client.setex(key, ttl_seconds, save_user_info)
         return bool(result)
 
     @exception_handler(generate_exc=False)
@@ -65,21 +61,23 @@ class Cache:
 
     @exception_handler(generate_exc=False)
     async def get_room_info(self, room_id: UUID) -> dict | None:
-        """Получение информации о пользователе из кеша"""
+        """Получение информации о комнате из кеша"""
         key = f'{self._room_info}:{room_id}'
-        result = await self.client.hgetall(key)
-        if not result:
+        json_raw_data = await self.client.get(key)
+        if not json_raw_data:
             return None
-        return result
+        room_info = json.loads(json_raw_data)
+        return room_info
 
     @exception_handler(generate_exc=False)
     async def get_user_info(self, user_id: str) -> dict | None:
         """Получение информации о пользователе из кеша"""
         key = f'{self._user_info_prefix}:{user_id}'
-        result = await self.client.hgetall(key)
-        if not result:
+        json_raw_data = await self.client.get(key)
+        if not json_raw_data:
             return None
-        return result
+        user_info = json.loads(json_raw_data)
+        return user_info
 
     @exception_handler(generate_exc=False)
     async def save_chat_msg_info(self, msg_info: MessageDtoGet, ttl_seconds: int = 3600 * 24) -> int:
