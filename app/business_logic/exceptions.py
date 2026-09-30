@@ -67,3 +67,10 @@ class SaveCodeError(Exception):
         self.user_id = user_id
         self.msg = f'Не удалось сохранить код подтверждения для пользователя {user_id}'
         super().__init__(self.msg)
+
+
+class UnsupportedFileTypeError(Exception):
+    """Тип файла не поддерживается"""
+    def __init__(self, msg):
+        self.message = msg
+        super().__init__(self.message)
