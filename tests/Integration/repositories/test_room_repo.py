@@ -1,7 +1,7 @@
 from uuid import uuid4
 import pytest
 from app.data_layer.exceptions import RecordNotFound
-from app.shared.dto import RoomDtoUpdate, RoomDtoSave, RoomMemberDtoSave
+from app.shared.dto import RoomDtoUpdate, RoomDtoSave, RoomMemberDtoSave, ChatDtoSave, ChatMemberDtoSave
 from contextlib import nullcontext
 
 
@@ -42,6 +42,7 @@ async def test_get_success(room_repo, default_room):
 async def test_save(room_repo, default_user, name, expected_context):
     """Тест для сохранения сообщения"""
     room_id = uuid4()
+    chat_id = uuid4()
     request = RoomDtoSave(
         id=room_id,
         name=name,
@@ -50,6 +51,17 @@ async def test_save(room_repo, default_user, name, expected_context):
             user_id=default_user.id
         )],
         owner_id=default_user.id,
+        chats=[ChatDtoSave(
+            id=chat_id,
+            name='chat',
+            room_id=room_id,
+            members=[
+                ChatMemberDtoSave(
+                    chat_id=chat_id,
+                    user_id=default_user.id
+                )
+            ]
+        ),]
     )
     with expected_context:
         room = await room_repo.save(request)
@@ -72,6 +84,7 @@ async def test_update_success(room_repo, default_room):
 async def test_delete_success(room_repo, default_room, default_user):
     """Тест для удаления сообщения"""
     room_id = uuid4()
+    chat_id = uuid4()
     new_room = RoomDtoSave(
         id=room_id,
         name='RoomTest',
@@ -80,6 +93,17 @@ async def test_delete_success(room_repo, default_room, default_user):
             user_id=default_user.id
         )],
         owner_id=default_user.id,
+        chats=[ChatDtoSave(
+            id=chat_id,
+            name='chat',
+            room_id=room_id,
+            members=[
+                ChatMemberDtoSave(
+                    chat_id=chat_id,
+                    user_id=default_user.id
+                )
+            ]
+        ),]
     )
     user = await room_repo.save(new_room)
     delete_room = await room_repo.delete(user.id)
