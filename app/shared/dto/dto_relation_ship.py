@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+
 from app.shared.dto import UserDtoBriefGet
 from app.shared.dto.chat import ChatDtoGet, ChatMemberDtoGet
 from app.shared.dto.room import RoomDtoGet, RoomMemberDtoGet
@@ -21,3 +23,9 @@ class ChatDtoGetWithRelation(ChatDtoGet):
     """DTO для получения чата с relationship"""
     room: RoomDtoGet
     members: list[ChatMemberDtoGet]
+
+
+class UserDtoGetWithRel(UserDtoGet):
+    """DTO для получения пользователя с relationship"""
+    room_members: list[RoomMemberDtoGet]
+    owned_rooms: list[RoomDtoGet]

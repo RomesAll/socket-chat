@@ -40,34 +40,25 @@ class UserDtoUpdateExtendedInfo(BaseModel):
     role: RoleEnum | None = None
 
 
-class UserInfoCache(BaseModel):
-    """DTO для сохранения инф. о пользователе в кещ"""
-    id: str
-    display_name: str
-    avatar_url: str
-    years_old: int
-    role: RoleEnum
-    email: str
-    created_at: datetime
-    updated_at: datetime
-
-
 class UserDtoBriefGet(BaseModel):
     """DTO для получения общей информации о пользователе"""
     id: str
     display_name: str
     avatar_url: str | None = None
-    description: str | None = None
-    years_old: int | None = None
-
 
 
 class UserDtoGet(UserDtoBriefGet):
     """DTO для получения информации о пользователе"""
+    user_info: UserDtoGetWithExtInfo
+
+
+class UserDtoGetWithExtInfo(BaseModel):
+    """DTO для получения расширенной информации о пользователе"""
+    description: str | None = None
+    years_old: int | None = None
     role: RoleEnum
     email: str
-    created_at: datetime
-    updated_at: datetime
+    last_seen_at: datetime
 
 
 class RegisterDtoGet(UserDtoGet):
