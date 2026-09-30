@@ -72,7 +72,7 @@ class ChatRepository(BaseRepository[Chat]):
         self.session.add(new_chat_member)
         return new_chat_member
 
-    async def delete_chat_member(self, chat_id: UUID, user_id: str) -> int:
+    async def remove_chat_member(self, chat_id: UUID, user_id: str) -> int:
         """Удаление участника чата"""
         stmt = (
             delete(self.CHAT_MEMBER_MODEL)
@@ -89,7 +89,7 @@ class ChatRepository(BaseRepository[Chat]):
         return len(deleted)
 
     async def update_member(self, chat_id: UUID, user_id: str, update_member: ChatMemberDtoUpdate) -> ChatMember:
-        """Обновления учатсника чата"""
+        """Обновления участника чата"""
         raw_data = update_member.model_dump(
             exclude_unset=True,
             exclude_none=True,

@@ -40,7 +40,9 @@ class MessageRepository(BaseRepository[Message]):
         messages = sqla_obj.scalars().all()
         return list(messages)
 
-    async def get_message_by_sender(self, date_limit: date, sender_id: str, with_relation: bool = False) -> dict[UUID, list[Message]]:
+    async def get_message_by_sender(
+            self, date_limit: date, sender_id: str, with_relation: bool = False
+    ) -> dict[UUID, list[Message]]:
         """Получение сообщений отправителя"""
         start = datetime.combine(date_limit, datetime.min.time())
         end = start + timedelta(days=1)
