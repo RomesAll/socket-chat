@@ -100,42 +100,60 @@ class WSBroker:
     async def _publish(self, package: dict):
         await self.redis.publish(self.CHANNEL, json.dumps(package))
 
-    async def publish_to_chat(self, chat_id: UUID, payload: dict):
+    async def publish_to_chat(self, action_type: str, chat_id: UUID, data: dict):
         await self._publish({
             'target': {'type_message': 'chat', 'chat_id': str(chat_id)},
-            'payload': payload,
+            'payload': {
+                'action_type': action_type,
+                'data': data
+            },
         })
 
-    async def publish_to_user(self, user_id: str, payload: dict):
+    async def publish_to_user(self, action_type: str, user_id: str, data: dict):
         await self._publish({
             'target': {'type_message': 'user', 'user_id': user_id},
-            'payload': payload,
+            'payload': {
+                'action_type': action_type,
+                'data': data
+            },
         })
 
-    async def publish_to_session(self, user_id: str, session_id: UUID, payload: dict):
+    async def publish_to_session(self, action_type: str, user_id: str, session_id: UUID, data: dict):
         await self._publish({
             'target': {
                 'type_message': 'session',
                 'user_id': user_id,
                 'session_id': str(session_id),
             },
-            'payload': payload,
+            'payload': {
+                'action_type': action_type,
+                'data': data
+            },
         })
 
-    async def publish_broadcast(self, payload: dict):
+    async def publish_broadcast(self, action_type: str, data: dict):
         await self._publish({
             'target': {'type_message': 'broadcast'},
-            'payload': payload,
+            'payload': {
+                'action_type': action_type,
+                'data': data
+            },
         })
 
-    async def publish_join_chat(self, chat_id: UUID, user_id: str):
+    async def publish_join_chat(self, action_type: str, chat_id: UUID, user_id: str):
         await self._publish({
             'target': {'type_message': 'join_chat', 'chat_id': str(chat_id), 'user_id': user_id},
-            'payload': {},
+            'payload': {
+                'action_type': action_type,
+                'data': ''
+            },
         })
 
-    async def publish_leave_chat(self, chat_id: UUID, user_id: str):
+    async def publish_leave_chat(self, action_type: str, chat_id: UUID, user_id: str):
         await self._publish({
             'target': {'type_message': 'leave_chat', 'chat_id': str(chat_id), 'user_id': user_id},
-            'payload': {},
+            'payload': {
+                'action_type': action_type,
+                'data': ''
+            },
         })
