@@ -7,9 +7,11 @@ from app.shared.dto.chat import ChatDtoGet, ChatMemberDtoGet, ChatMemberDtoSave,
 from app.shared.dto.dto_relation_ship import ChatDtoGetWithRelation
 from app.shared.dto.room import RoomDtoGet
 from app.shared.log_config import LogMixin
-from app.shared.config import get_config, AppMode
+from app.shared.config import get_config, AppMode, BaseConfig
 
-config = get_config()
+
+def _get_config() -> BaseConfig:
+    return get_config()
 
 
 class ChatService(LogMixin):
@@ -77,7 +79,7 @@ class ChatService(LogMixin):
             chat_orm = await uow.chat_repo.add_chat_member(chat_member)
             self.log_info(f'Пользователь {chat_member.user_id} был добавлен в чат {chat_member.chat_id}')
             response = ChatMemberDtoGet(**chat_orm.to_dict())
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Add member in chat',
                     payload=response.model_dump(),
@@ -96,7 +98,7 @@ class ChatService(LogMixin):
         async with self._uow as uow:
             res = await uow.chat_repo.remove_chat_member(chat_id, user_id)
             self.log_info(f'Пользователь {user_id} был удален из чата {chat_id}')
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Remove member in chat',
                     payload={'user_id': user_id},

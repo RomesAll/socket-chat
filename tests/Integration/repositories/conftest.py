@@ -1,27 +1,26 @@
+from app.data_layer.models import Base
 from app.data_layer.repositories import (
     UserRepository,
     ChatRepository,
     RoomRepository,
     MessageRepository
 )
-from alembic.config import Config, command
-from app.shared.config import create_config, AppMode
 import pytest
+import pytest_asyncio
 
-config = create_config(mode=AppMode.TEST)
 
-
-@pytest.fixture(scope='session', autouse=True)
-def migration_db():
+@pytest_asyncio.fixture(scope='session', autouse=True, loop_scope='session')
+async def setup_db(async_engine):
     """
     Глобальная фикстура: срабатывает один раз при старте тестов.
-    Накатывает миграции Alembic на тестовую БД перед тестами и откатывает после
+    Создает таблицы в базе данных
     """
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option('sqlalchemy.url', config.postgres.url)
-    command.upgrade(alembic_cfg, 'head')
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
     yield
-    command.downgrade(alembic_cfg, 'base')
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture(scope='function')

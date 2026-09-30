@@ -5,11 +5,11 @@ from contextlib import nullcontext
 
 
 @pytest.mark.asyncio
-async def test_get_by_id_success(user_repo, default_user):
+async def test_get_by_id_success(user_repo, default_user_in_session):
     """Тест для получения пользователя по id"""
-    user = await user_repo.get_user_by_id(default_user.id)
-    assert user.id == default_user.id
-    assert user.display_name == default_user.display_name
+    user = await user_repo.get_user_by_id(default_user_in_session.id)
+    assert user.id == default_user_in_session.id
+    assert user.display_name == default_user_in_session.display_name
 
 
 @pytest.mark.asyncio
@@ -22,12 +22,12 @@ async def test_get_by_id_not_found(user_repo):
 
 
 @pytest.mark.asyncio
-async def test_get_success(user_repo, default_user):
+async def test_get_success(user_repo, default_user_in_session):
     """Тест для получения пользователей"""
     users = await user_repo.get_users(limit=1, offset=0)
     assert type(users) == list
     assert len(users) == 1
-    assert users[-1].id == default_user.id
+    assert users[-1].id == default_user_in_session.id
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_save(user_repo, user_id, display_name, years_old, email, password
 
 
 @pytest.mark.asyncio
-async def test_update_success(user_repo, default_user):
+async def test_update_success(user_repo, default_user_in_session):
     """Тест для обновления пользователей"""
     display_name = 'update'
     avatar_url = '/home/1.txt'
@@ -70,7 +70,7 @@ async def test_update_success(user_repo, default_user):
         display_name=display_name,
         avatar_url=avatar_url
     )
-    user = await user_repo.update_default_info(default_user.id, update_data)
+    user = await user_repo.update_default_info(default_user_in_session.id, update_data)
     assert user.display_name == display_name
     assert user.avatar_url == avatar_url
 

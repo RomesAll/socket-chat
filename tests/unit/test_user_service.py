@@ -66,7 +66,7 @@ async def test_get_users_extension_info(uow_mock, default_user_orm):
 
     uow_mock.user_repo.get_users.assert_called_once()
     assert user_dto_result[0].id == default_user_orm.id
-    assert hasattr(user_dto_result[0], 'email')
+    assert hasattr(user_dto_result[0].user_info, 'email')
 
 
 @pytest.mark.asyncio

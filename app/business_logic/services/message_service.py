@@ -13,9 +13,11 @@ from app.shared.dto.message import MessageDtoGet, MessageAttachmentDtoGet
 from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, RegisterDtoGet, UserDtoUpdateDefaultInfo, \
     UserDtoUpdateExtendedInfo
 from app.shared.log_config import LogMixin
-from app.shared.config import get_config, AppMode
+from app.shared.config import get_config, AppMode, BaseConfig
 from collections import deque
-config = get_config()
+
+def _get_config() -> BaseConfig:
+    return get_config()
 
 
 class MessageService(LogMixin):
@@ -36,7 +38,7 @@ class MessageService(LogMixin):
             msg_orm = await uow.msg_repo.save(msg_dto)
             self.log_info(f'Сообщение пользователя {msg_dto.sender_id} было успешно сохранено в чат {msg_dto.chat_id}')
             response = MessageDtoGet(**msg_orm.to_dict())
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Save new message',
                     payload=response.model_dump(),

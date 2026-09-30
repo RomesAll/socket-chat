@@ -12,8 +12,11 @@ from app.shared.dto.room import (
 )
 from app.shared.dto.user import UserDtoBriefGet
 from app.shared.log_config import LogMixin
-from app.shared.config import get_config, AppMode
-config = get_config()
+from app.shared.config import get_config, AppMode, BaseConfig
+
+
+def _get_config() -> BaseConfig:
+    return get_config()
 
 
 class RoomService(LogMixin):
@@ -33,7 +36,7 @@ class RoomService(LogMixin):
             response = RoomDtoGetWithRelation(
                 **room_orm.to_dict(), chats=chats_dto, members=members_dto, owner=owner_dto
             )
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Save new room',
                     payload=response.model_dump(),
@@ -103,7 +106,7 @@ class RoomService(LogMixin):
             room_member_orm = await uow.room_repo.add_member_in_room(member)
             self.log_info(f'Пользователь {member.user_id} успешно добавлен в комнату {room_member_orm.room_id}')
             response = RoomMemberDtoGet(**room_member_orm.to_dict())
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Add new member in room',
                     payload=response.model_dump(),
@@ -118,7 +121,7 @@ class RoomService(LogMixin):
             room_member_orm = await uow.room_repo.remove_member_in_room(room_id, user_id)
             self.log_info(f'Пользователь {user_id} успешно удален из комнаты {room_id}')
             response = RoomMemberDtoGet(**room_member_orm.to_dict())
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Remove member in room',
                     payload=response.model_dump(),
@@ -133,7 +136,7 @@ class RoomService(LogMixin):
             room_orm = await uow.room_repo.delete(room_id)
             self.log_info(f'Комната была удалена {room_id}')
             response = RoomDtoGet(**room_orm.to_dict())
-            if config.mode not in (AppMode.DEV,):
+            if _get_config().mode not in (AppMode.DEV,):
                 uow.add_event(
                     event_name='Remove room',
                     payload=response.model_dump(),

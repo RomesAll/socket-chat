@@ -5,7 +5,6 @@ from app.data_layer.models import RoleEnum
 from app.shared.dto.jwt import JWTAccessToken, JWTRefreshToken
 
 
-@pytest.mark.asyncio
 def test_access_token():
     """Тест создания и декодирования access токена"""
     request = JWTAccessToken(
@@ -23,7 +22,6 @@ def test_access_token():
     assert payload.session_id == request.session_id
 
 
-@pytest.mark.asyncio
 def test_refresh_token():
     """Тест создания и декодирования refresh токена"""
     request = JWTRefreshToken(

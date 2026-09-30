@@ -58,7 +58,7 @@ class UserDtoGetWithExtInfo(BaseModel):
     years_old: int | None = None
     role: RoleEnum
     email: str
-    last_seen_at: datetime
+    last_seen_at: datetime | None = None
 
 
 class RegisterDtoGet(UserDtoGet):

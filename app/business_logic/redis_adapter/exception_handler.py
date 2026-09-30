@@ -1,6 +1,11 @@
 from functools import wraps
 from redis.exceptions import *
 from app.business_logic.exceptions import *
+from app.shared.config import get_config
+
+
+def _get_url() -> str:
+    return get_config().redis.url
 
 
 def exception_handler(generate_exc: bool = False):
@@ -13,11 +18,11 @@ def exception_handler(generate_exc: bool = False):
                 result = await func(self, *args, **kwargs)
                 return result
             except AuthenticationError as e:
-                exc = AuthRedisError(self.url, str(e))
+                exc = AuthRedisError(_get_url(), str(e))
             except TimeoutError as e:
-                exc = RedisConnectionError(self.url, str(e))
+                exc = RedisConnectionError(_get_url(), str(e))
             except ConnectionError as e:
-                exc = RedisConnectionError(self.url, str(e))
+                exc = RedisConnectionError(_get_url(), str(e))
             except DataError as e:
                 exc = DataErrorRedis(str(e))
             except ResponseError as e:
