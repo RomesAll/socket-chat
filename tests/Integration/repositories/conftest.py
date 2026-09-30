@@ -1,12 +1,27 @@
-from uuid import uuid4
-from app.data_layer.models import User, UserInfo, Chat, Room, ChatMember, Message, MessageType
 from app.data_layer.repositories import (
     UserRepository,
     ChatRepository,
     RoomRepository,
     MessageRepository
 )
+from alembic.config import Config, command
+from app.shared.config import create_config, AppMode
 import pytest
+
+config = create_config(mode=AppMode.TEST)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def migration_db():
+    """
+    Глобальная фикстура: срабатывает один раз при старте тестов.
+    Накатывает миграции Alembic на тестовую БД перед тестами и откатывает после
+    """
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option('sqlalchemy.url', config.postgres.url)
+    command.upgrade(alembic_cfg, 'head')
+    yield
+    command.downgrade(alembic_cfg, 'base')
 
 
 @pytest.fixture(scope='function')
@@ -31,66 +46,3 @@ def room_repo(sql_session):
 def message_repo(sql_session):
     """Фикстура для получения message репозитория с асинхронной сессией"""
     return MessageRepository(sql_session)
-
-
-@pytest.fixture(scope='function')
-async def default_user(sql_session) -> User:
-    """Фикстура для добавления базового пользователя в сессию"""
-    user = User(
-        id='RomanSky',
-        display_name='Роман',
-        user_info=UserInfo(
-            id='RomanSky',
-            email='romesky@gmail.com',
-            password=b'hello',
-        )
-    )
-    sql_session.add(user)
-    await sql_session.flush()
-    return user
-
-
-@pytest.fixture(scope='function')
-async def default_chat(sql_session, default_user) -> Chat:
-    """Фикстура для добавления базового чата в сессию"""
-    chat_id = uuid4()
-    chat = Chat(
-        id=chat_id,
-        name='TestChat',
-        members=[ChatMember(
-            chat_id=chat_id,
-            user_id=default_user.id
-        )]
-    )
-    sql_session.add(chat)
-    await sql_session.flush()
-    return chat
-
-
-@pytest.fixture(scope='function')
-async def default_room(sql_session, default_user) -> Room:
-    """Фикстура для добавления базовой комнаты в сессию"""
-    room_id = uuid4()
-    room = Room(
-        id=room_id,
-        name='TestRoom',
-        description='',
-        owner_id=default_user.id,
-    )
-    sql_session.add(room)
-    return room
-
-
-@pytest.fixture(scope='function')
-async def default_message(sql_session, default_user, default_chat) -> Message:
-    """Фикстура для добавления базового сообщения в сессию"""
-    message_id = uuid4()
-    message = Message(
-        id=message_id,
-        chat_id=default_chat.id,
-        sender_id=default_user.id,
-        body_encrypted='hello world',
-        type=MessageType.TEXT,
-    )
-    sql_session.add(message)
-    return message
