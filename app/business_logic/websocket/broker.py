@@ -45,3 +45,54 @@ class WSBroker:
                 pass
             await self._pubsub.close()
             self._pubsub = None
+
+    async def _listen(self):
+        """Бесконечный цикл чтения канала, работает в отдельной задаче"""
+        if self._pubsub is None:
+            return
+        try:
+            async for message in self._pubsub.listen():
+                if self._stopping:
+                    break
+                if message.get('type_package') != 'message':
+                    continue
+                try:
+                    package = json.loads(message['data'])
+                except Exception:
+                    continue
+                try:
+                    await self._dispatch_package(package)
+                except Exception:
+                    continue
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+    async def _dispatch_package(self, package: dict):
+        """Обработка пакета"""
+        target = package.get('target') or {}
+        payload = package.get('payload') or {}
+        type_message = target.get('type_message')
+
+        match type_message:
+            case 'chat':
+                await self.manager.send_to_chat(UUID(target['chat_id']), payload)
+            case 'user':
+                await self.manager.send_to_user(target['user_id'], payload)
+            case 'session':
+                await self.manager.send_to_session(
+                    target['user_id'],
+                    UUID(target['session_id']),
+                    payload,
+                )
+            case 'broadcast':
+                await self.manager.broadcast(payload)
+            case 'join_chat':
+                sessions = self.manager.active_session.get(target['user_id'], {})
+                for ws in sessions.values():
+                    self.manager.join_in_chat(ws, UUID(target['chat_id']))
+            case 'leave_chat':
+                sessions = self.manager.active_session.get(target['user_id'], {})
+                for ws in sessions.values():
+                    self.manager.leave_chat(ws, UUID(target['chat_id']))
