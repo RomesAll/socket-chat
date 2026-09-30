@@ -39,17 +39,6 @@ class User(StrIdMixin, Base):
         foreign_keys='Room.owner_id',
     )
 
-    def to_dict_without_nested_attr(self) -> dict:
-        return {
-            'id': self.id,
-            'display_name': self.display_name,
-            'avatar_url': self.avatar_url,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
-            **self.user_info.to_dict_without_nested_attr(),
-        }
-
-
 
 class UserInfo(Base):
     """Orm модель для хранения расширенной информации о пользователях"""
@@ -61,16 +50,3 @@ class UserInfo(Base):
     password: Mapped[bytes] = mapped_column(LargeBinary(60))
     last_seen_at: Mapped[datetime] = mapped_column(default=None, nullable=True)
     user: Mapped['User'] = relationship(back_populates='user_info')
-
-    def to_dict_without_nested_attr(self) -> dict:
-        return {
-            'id': self.id,
-            'description': self.description,
-            'years_old': self.years_old,
-            'role': self.role,
-            'email': self.email,
-            'password': self.password,
-            'last_seen_at': self.last_seen_at,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
-        }
