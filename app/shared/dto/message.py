@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel
 from app.data_layer.models import MessageType
+from app.data_layer.models.messages import MimeType
 
 
 class MessageDtoSave(BaseModel):
@@ -41,3 +42,19 @@ class MessageAttachmentDtoSave(BaseModel):
     file_path: str
     mime_type: str
     size: int
+
+
+class MessageAttachmentDtoGet(MessageAttachmentDtoSave):
+    """DTO для хранения метаданных файлов"""
+    created_at: datetime
+    updated_at: datetime
+
+
+class MessageAttachmentsDtoPostRequest(BaseModel):
+    """User DTO для операции добавления (Post) информации о файлах"""
+    id: UUID
+    message_id: UUID
+    file_name: str
+    file_path: str
+    file_size: int
+    mime_type: MimeType
