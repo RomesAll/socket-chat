@@ -1,15 +1,22 @@
-import random
 from app.business_logic.psw_manager import PasswordManager
 from app.business_logic.redis_adapter import VerifyCodeStorage, Cache
-from app.data_layer.models import User, UserInfo
+from app.data_layer.models import User
 from app.data_layer.models.events import EventType
 from app.business_logic.unit_of_work import UnitOfWork
 from app.shared.dto import UserDtoSave
-from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, RegisterDtoGet, UserDtoUpdateDefaultInfo, \
-    UserDtoUpdateExtendedInfo
+from app.shared.dto.dto_relation_ship import UserDtoGetWithRel
+from app.shared.dto.room import RoomMemberDtoGet, RoomDtoGet
+from app.shared.dto.user import (
+    UserDtoGet,
+    UserDtoBriefGet,
+    RegisterDtoGet,
+    UserDtoUpdateDefaultInfo,
+    UserDtoUpdateExtendedInfo,
+    UserDtoGetWithExtInfo
+)
 from app.shared.log_config import LogMixin
 from app.shared.config import get_config, AppMode
-from collections import deque
+import random
 config = get_config()
 
 
@@ -26,6 +33,95 @@ class UserService(LogMixin):
         self._verify_code_storage = verify_code_storage
         self._psw_manager = psw_manager
         self._cache = cache
+
+    async def get_users_brief_info(self, limit: int, offset: int) -> list[UserDtoBriefGet]:
+        """Получение краткой информации о пользователях с пагинацией"""
+        async with self._uow as uow:
+            users_orm = await uow.user_repo.get_users(limit, offset, with_relation=False)
+            response = [
+                UserDtoBriefGet(**user.to_dict())
+                for user in users_orm
+            ]
+            return response
+
+    async def get_users_ext_info(self, limit: int, offset: int) -> list[UserDtoGet]:
+        """Получение расширенной информации о пользователях с пагинацией"""
+        async with self._uow as uow:
+            users_orm = await uow.user_repo.get_users(limit, offset, with_relation=True)
+            response = [
+                UserDtoGet(
+                    **user.to_dict(),
+                    user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict())
+                )
+                for user in users_orm
+            ]
+            return response
+
+    async def get_users_with_rel(self, limit: int, offset: int) -> list[UserDtoGetWithRel]:
+        """
+        Получение расширенной информации о комнатах, в которых пользователь состоит
+        и владельцем которых он является
+        """
+        async with self._uow as uow:
+            users_orm = await uow.user_repo.get_users(limit, offset, with_relation=True)
+            response = [
+                UserDtoGetWithRel(
+                    **user.to_dict(),
+                    user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict()),
+                    room_members=[RoomMemberDtoGet(**room_member.to_dict()) for room_member in user.room_members],
+                    owned_rooms=[RoomDtoGet(**room.to_dict()) for room in users_orm.owned_rooms]
+                )
+                for user in users_orm
+            ]
+            return response
+
+    async def _get_user(self, user_id) -> User:
+        async with self._uow as uow:
+            user_orm = await uow.user_repo.get_user_by_id(user_id, with_relation=False)
+            return user_orm
+
+    async def get_user_brief_info(self, user_id: str) -> UserDtoBriefGet:
+        """Получение краткой информации о пользователе по id"""
+        cache_data = await self._cache.get_user_info(user_id)
+        if cache_data:
+            return UserDtoBriefGet(**cache_data)
+        user_orm = await self._get_user(user_id)
+        user_ext_dto = UserDtoGet(
+            **user_orm.to_dict(),
+            user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict()),
+        )
+        user_brief_info_dto = UserDtoBriefGet(**user_orm.to_dict())
+        is_saved = await self._cache.save_user_info(user_ext_dto)
+        if not is_saved:
+           self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
+        return user_brief_info_dto
+
+    async def get_user_ext_info(self, user_id: str) -> UserDtoGet:
+        """Получение расширенной информации о пользователе по id"""
+        cache_data = await self._cache.get_user_info(user_id)
+        if cache_data:
+            return UserDtoGet(**cache_data)
+        user_orm = await self._get_user(user_id)
+        user_ext_dto = UserDtoGet(
+            **user_orm.to_dict(),
+            user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict()),
+        )
+        is_saved = await self._cache.save_user_info(user_ext_dto)
+        if not is_saved:
+            self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
+        return user_ext_dto
+
+    async def get_user_with_rel(self, user_id: str) -> UserDtoGetWithRel:
+        """Получение расширенной информации о пользователе по id с relationship"""
+        async with self._uow as uow:
+            user_orm = await uow.user_repo.get_user_by_id(user_id, with_relation=True)
+            response = UserDtoGetWithRel(
+                **user_orm.to_dict(),
+                user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict()),
+                room_members=[RoomMemberDtoGet(**room_member.to_dict()) for room_member in user_orm.room_members],
+                owned_rooms=[RoomDtoGet(**room.to_dict()) for room in user_orm.owned_rooms]
+            )
+        return response
 
     async def add_user(self, new_user: UserDtoSave) -> RegisterDtoGet:
         """
@@ -60,103 +156,6 @@ class UserService(LogMixin):
         is_saved = await self._cache.save_user_info(user_info=cache_data)
         if not is_saved:
            self.log_warning(f'Пользователь {new_user.id} не был сохранен в кеше')
-        return response
-
-    async def _get_users_info(
-            self, limit: int, offset: int, with_relation: bool = False
-    ) -> list[User]:
-        """
-        Получение информации о пользователях с возможностью получение связных записей
-        (relationship)
-        :param limit: кол-во записей
-        :param offset: пропуск
-        :param with_relation: выводить ли связанные записи
-        :return: list[UserDtoBriefGet]
-        """
-        async with self._uow as uow:
-            users = await uow.user_repo.get_users(limit, offset, with_relation)
-            self.log_debug(f'Получение списка пользователей')
-            return users
-
-    async def get_users_brief_info(
-            self, limit: int, offset: int, with_relation: bool = False
-    ) -> list[UserDtoBriefGet]:
-        """
-        Получение краткой информации о пользователях с возможностью получение связных записей
-        (relationship)
-        :param limit: кол-во записей
-        :param offset: пропуск
-        :param with_relation: выводить ли связанные записи
-        :return: list[UserDtoBriefGet]
-        """
-        users = await self._get_users_info(limit, offset, with_relation)
-        response = [
-            UserDtoBriefGet(**user.to_dict_without_nested_attr())
-            for user in users
-        ]
-        return response
-
-    async def get_users_extension_info(
-            self, limit: int, offset: int, with_relation: bool = False
-    ) -> list[UserDtoGet]:
-        """
-        Получение расширенной информации о пользователях с возможностью получение связных записей
-        (relationship)
-        :param limit: кол-во записей
-        :param offset: пропуск
-        :param with_relation: выводить ли связанные записи
-        :return: list[UserDtoGet]
-        """
-        users = await self._get_users_info(limit, offset, with_relation)
-        response = [
-            UserDtoGet(**user.to_dict_without_nested_attr())
-            for user in users
-        ]
-        return response
-
-    async def _get_user_by_id(
-            self, user_id: str, with_relation: bool = False
-    ) -> dict:
-        """
-        Получение информации о пользователе с возможностью получение связных записей
-        (relationship)
-        :param user_id: id пользователя
-        :param with_relation: выводить ли связанные записи
-        :return: User
-        """
-        async with self._uow as uow:
-            if not (user := await self._cache.get_user_info(user_id)):
-                user = await uow.user_repo.get_user_by_id(user_id, with_relation).to
-                user = user.to_dict_without_nested_attr()
-                self.log_debug(f'Получение информации о пользователе {user['id']}')
-            return user
-
-    async def get_user_by_id_brief_info(
-            self, user_id: str, with_relation: bool = False
-    ) -> UserDtoBriefGet:
-        """
-        Получение краткой информации о пользователе с возможностью получение связных записей
-        (relationship)
-        :param user_id: id пользователя
-        :param with_relation: выводить ли связанные записи
-        :return: UserDtoBriefGet
-        """
-        user = await self._get_user_by_id(user_id, with_relation)
-        response = UserDtoGet(**user)
-        return response
-
-    async def get_user_by_id_extension_info(
-            self, user_id: str, with_relation: bool = False
-    ) -> UserDtoGet:
-        """
-        Получение расширенной информации о пользователе с возможностью получение связных записей
-        (relationship)
-        :param user_id: id пользователя
-        :param with_relation: выводить ли связанные записи
-        :return: UserDtoGet
-        """
-        user = await self._get_user_by_id(user_id, with_relation)
-        response = UserDtoGet(**user)
         return response
 
     async def update_default_info_user(
@@ -228,7 +227,7 @@ class UserService(LogMixin):
                 payload=user.to_dict_without_nested_attr(),
                 event_type=EventType.DELETE_USER
             )
-        is_saved = await self._cache.delete_user_info(str(user.id))
-        if not is_saved:
+        is_deleted = await self._cache.delete_user_info(str(user.id))
+        if not is_deleted:
             self.log_warning(f'Пользователь {user_id} не был удален из кеша')
         return UserDtoGet(**user.to_dict_without_nested_attr())
