@@ -17,6 +17,8 @@ services:
     ports:
       - "${REDIS__PORT}:6379"
     command: redis-server --requirepass ${REDIS__PASSWORD} --appendonly yes
+    networks:
+      - chat_network
 
   postgres_dev:
     image: postgres:17-alpine
@@ -34,6 +36,8 @@ services:
       postgres
       -c timezone=UTC
       -c log_timezone=UTC
+    networks:
+      - chat_network
 
   pgadmin_dev:
     image: dpage/pgadmin4:latest
@@ -56,3 +60,26 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB__USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB__PASSWORD}
+    networks:
+      - chat_network
+
+  mongo-express-dev:
+    image: mongo-express:latest
+    container_name: mongo-express-dev
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://root:qwerty@mongodb_dev:27017/?authSource=admin
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: pass8081
+    depends_on:
+      - mongodb_dev
+    networks:
+      - chat_network
+
+
+
+networks:
+  chat_network:
+    driver: bridge

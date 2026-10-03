@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.data_layer.models import Message, MessageAttachment
-from app.shared.dto.message import MessageDtoSave, MessageAttachmentDtoSave
+from app.shared.dto.message import MessageDtoCreate, MessageAttachmentDtoSave
 
 
 class MessageRepository(BaseRepository[Message]):
@@ -17,7 +17,7 @@ class MessageRepository(BaseRepository[Message]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
         self.MAPPING_DTO_ORM_SAVE.update({
-            MessageDtoSave: Message,
+            MessageDtoCreate: Message,
             MessageAttachmentDtoSave: MessageAttachment
         })
 

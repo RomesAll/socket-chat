@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from app.business_logic.services.message_service import MessageService
 import pytest
 
@@ -10,11 +10,14 @@ async def test_send_and_save_message(uow_mock, save_msg_dto, default_message_orm
 
     cache = AsyncMock()
     broker = AsyncMock()
+    cipher = MagicMock()
+    cipher.decrypt.return_value = 'hello world'
 
     msg_response = await MessageService(
         uow=uow_mock,
         cache=cache,
-        broker=broker
+        broker=broker,
+        cipher=cipher
     ).send_and_save_message(save_msg_dto)
 
     cache.save_chat_msg_info.assert_called_once()

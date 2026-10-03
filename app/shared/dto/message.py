@@ -10,7 +10,7 @@ class MessageDtoSave(BaseModel):
     id: UUID
     chat_id: UUID
     sender_id: str
-    body_encrypted: str
+    body: str = ''
     type: MessageType
     reply_to_message_id: UUID | None = None
     forwarded_from_message_id: UUID | None = None
@@ -19,8 +19,30 @@ class MessageDtoSave(BaseModel):
     message_file: list[MessageAttachmentDtoSave] | None = None
 
 
-class MessageDtoGet(MessageDtoSave):
+class MessageDtoCreate(BaseModel):
+    """DTO для сохранения сообщений"""
+    id: UUID
+    chat_id: UUID
+    sender_id: str
+    body_encrypted: str = ''
+    type: MessageType
+    reply_to_message_id: UUID | None = None
+    forwarded_from_message_id: UUID | None = None
+    forwarded_from_user_id: str | None = None
+    is_edited: bool = False
+    message_file: list[MessageAttachmentDtoSave] | None = None
+
+
+class MessageDtoGetWithBodyEncrypted(MessageDtoCreate):
     """DTO для получения сохраненного сообщения"""
+    created_at: datetime
+    updated_at: datetime
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
+
+
+class MessageDtoGetWithBodyDecrypted(MessageDtoSave):
+    """DTO для сохранения сообщений в кеше"""
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False

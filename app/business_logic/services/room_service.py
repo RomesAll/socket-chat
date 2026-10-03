@@ -40,9 +40,9 @@ class RoomService(LogMixin):
                 uow.add_event(
                     event_name='Save new room',
                     payload=response.model_dump(),
-                    event_type=EventType.NEW_ROOM
+                    event_type=EventType.CRETE_NEW_ROOM
                 )
-                self.log_info(f'Событие {EventType.NEW_ROOM} зарегистрировано')
+                self.log_info(f'Событие {EventType.CRETE_NEW_ROOM} зарегистрировано')
         is_saved = await self._cache.save_room(
             RoomDtoGet.model_dump(response)
         )
@@ -140,9 +140,9 @@ class RoomService(LogMixin):
                 uow.add_event(
                     event_name='Remove room',
                     payload=response.model_dump(),
-                    event_type=EventType.REMOVE_ROOM
+                    event_type=EventType.DELETE_ROOM
                 )
-                self.log_info(f'Событие {EventType.REMOVE_ROOM} зарегистрировано')
+                self.log_info(f'Событие {EventType.DELETE_ROOM} зарегистрировано')
         is_saved = await self._cache.delete_room_info(room_id)
         if not is_saved:
             self.log_warning(f'Комната {room_id} не была сохранена в кеше')
