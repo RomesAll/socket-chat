@@ -11,6 +11,7 @@ from typing import Callable
 
 
 class StatisticManager:
+    """Класс для управления статистикой"""
     def __init__(self, session: AsyncSession):
         self._session = session
 
@@ -166,7 +167,7 @@ class StatisticManager:
     retry_jitter=True,
 )
 def update_statistics(self, type_action: str, payload: dict):
-    """Celery задача для сохранения истории изменения объекта бд"""
+    """Celery задача для сохранения статистики в бд"""
     asyncio.run(_update_statistics(type_action, payload))
 
 
