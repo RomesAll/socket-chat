@@ -152,7 +152,7 @@ class UserService(LogMixin):
                 uow.add_event(
                     event_name='Save new user',
                     payload=response.model_dump(),
-                    event_type=EventType.NEW_USER
+                    event_type=EventType.CREATE_NEW_USER
                 )
                 self.log_info(f'Событие NEW_USER зарегистрировано для пользователя {new_user.id}')
             else:
@@ -230,12 +230,16 @@ class UserService(LogMixin):
         async with self._uow as uow:
             user = await uow.user_repo.delete(user_id)
             self.log_info(f'Удалена информация о пользователе {user.id}')
+            response = UserDtoGet(
+                **user.to_dict(),
+                user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict())
+            )
             uow.add_event(
                 event_name='Delete user',
-                payload=user.to_dict(),
+                payload=response.model_dump(),
                 event_type=EventType.DELETE_USER
             )
         is_deleted = await self._cache.delete_user_info(str(user.id))
         if not is_deleted:
             self.log_warning(f'Пользователь {user_id} не был удален из кеша')
-        return UserDtoGet(**user.to_dict())
+        return response
