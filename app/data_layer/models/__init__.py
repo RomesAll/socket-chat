@@ -6,7 +6,7 @@ from .users import User, UserInfo, RoleEnum
 
 
 __author__ = 'RomesAll'
-__version__ = 'v0.2.0'
+__version__ = 'v0.3.0'
 __all__ = [
     'Base',
     'Message',

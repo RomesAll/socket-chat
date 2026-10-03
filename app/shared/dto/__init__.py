@@ -6,7 +6,7 @@ from .user import UserDtoInfoSave, UserDtoSave, UserDtoUpdateDefaultInfo, UserDt
 from app.shared.dto import user, room, chat
 
 __author__ = 'RomesAll'
-__version__ = 'v0.2.0'
+__version__ = 'v0.3.0'
 __all__ = [
     'MessageType',
     'ChatMemberDtoSave',
