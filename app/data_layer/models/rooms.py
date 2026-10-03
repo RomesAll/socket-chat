@@ -20,7 +20,7 @@ class RoomRole(str, Enum):
 class Room(UuidIsMixin, Base):
     """Orm модель для хранения информации о комнатах"""
     name: Mapped[str] = mapped_column(String(20))
-    description: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(String(100), default=None, nullable=True)
     avatar_url: Mapped[str] = mapped_column(default=None, nullable=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey('user.id', ondelete='CASCADE'))
     is_private: Mapped[bool] = mapped_column(default=True)
@@ -29,7 +29,7 @@ class Room(UuidIsMixin, Base):
         back_populates='room',
         cascade='all, delete-orphan',
     )
-    chat: Mapped['Chat'] = relationship(back_populates='room')
+    chats: Mapped[list['Chat']] = relationship(back_populates='room')
 
 
 class RoomMember(Base):

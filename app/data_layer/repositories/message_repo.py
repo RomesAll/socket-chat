@@ -3,11 +3,10 @@ from uuid import UUID
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.data_layer.models import Message, MessageAttachment
-from app.shared.dto.message import MessageDtoSave, MessageDtoUpdate, MessageAttachmentDtoSave
+from app.shared.dto.message import MessageDtoSave, MessageAttachmentDtoSave
 
 
 class MessageRepository(BaseRepository[Message]):
@@ -41,7 +40,9 @@ class MessageRepository(BaseRepository[Message]):
         messages = sqla_obj.scalars().all()
         return list(messages)
 
-    async def get_message_by_sender(self, date_limit: date, sender_id: str, with_relation: bool = False) -> dict[UUID, list[Message]]:
+    async def get_message_by_sender(
+            self, date_limit: date, sender_id: str, with_relation: bool = False
+    ) -> dict[UUID, list[Message]]:
         """Получение сообщений отправителя"""
         start = datetime.combine(date_limit, datetime.min.time())
         end = start + timedelta(days=1)
@@ -74,7 +75,7 @@ class MessageRepository(BaseRepository[Message]):
         sqla_obj = await self.session.execute(stmt)
         msg_file = sqla_obj.scalar_one_or_none()
         if not msg_file:
-            raise RecordNotFound(file_id, self.MODEL, 'id')
+            raise RecordNotFound(file_id, self.MODEL.__tablename__, 'id')
         return msg_file
 
     def _with_msg_options(self):

@@ -72,7 +72,7 @@ class ChatRepository(BaseRepository[Chat]):
         self.session.add(new_chat_member)
         return new_chat_member
 
-    async def delete_chat_member(self, chat_id: UUID, user_id: str) -> int:
+    async def remove_chat_member(self, chat_id: UUID, user_id: str) -> int:
         """Удаление участника чата"""
         stmt = (
             delete(self.CHAT_MEMBER_MODEL)
@@ -85,11 +85,11 @@ class ChatRepository(BaseRepository[Chat]):
         sqla_obj = await self.session.execute(stmt)
         deleted = sqla_obj.scalars().all()
         if not deleted:
-            raise RecordNotFound(chat_id, self.MODEL, 'id')
+            raise RecordNotFound(chat_id, self.MODEL.__tablename__, 'id')
         return len(deleted)
 
     async def update_member(self, chat_id: UUID, user_id: str, update_member: ChatMemberDtoUpdate) -> ChatMember:
-        """Обновления учатсника чата"""
+        """Обновления участника чата"""
         raw_data = update_member.model_dump(
             exclude_unset=True,
             exclude_none=True,
@@ -107,7 +107,7 @@ class ChatRepository(BaseRepository[Chat]):
         sqla_obj = await self.session.execute(stmt)
         member_info = sqla_obj.scalar_one_or_none()
         if not member_info:
-            raise RecordNotFound(f'чат={chat_id}, user={user_id}', self.MODEL, 'id')
+            raise RecordNotFound(f'чат={chat_id}, user={user_id}', self.MODEL.__tablename__, 'id')
         for k, v in raw_data.items():
             setattr(member_info, k, v)
         return member_info

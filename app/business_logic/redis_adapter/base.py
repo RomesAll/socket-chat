@@ -24,7 +24,7 @@ class RedisConnection(metaclass=RedisConnectionSingleton):
 
     async def connection(self, url: str) -> Redis:
         if self._client is None:
-            client = Redis.from_url(url)
+            client = Redis.from_url(url, decode_responses=True)
             await client.ping()
             self._client = client
         return self._client

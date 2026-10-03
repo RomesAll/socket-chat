@@ -23,7 +23,7 @@ class Chat(UuidIsMixin, Base):
         nullable=True,
         default=None
     )
-    room: Mapped['Room'] = relationship(back_populates='chat')
+    room: Mapped['Room'] = relationship(back_populates='chats')
     members: Mapped[list['ChatMember']] = relationship(back_populates='chat', cascade='all, delete-orphan',)
 
 

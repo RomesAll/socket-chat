@@ -1,7 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
-
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.shared.dto import UserDtoSave, UserDtoInfoSave
@@ -21,12 +20,12 @@ class UserRepository(BaseRepository[User]):
             UserDtoInfoSave: UserInfo
         })
 
-    async def get_users(self, with_relation: bool = False) -> list[User]:
+    async def get_users(self, limit: int, offset: int, with_relation: bool = False) -> list[User]:
         """Получение списка пользователей"""
         options = None
         if with_relation:
             options = self._with_user_options()
-        result = await self._get(options)
+        result = await self._get(limit, offset, options)
         return result
 
     async def get_user_by_id(self, user_id: str, with_relation: bool = False) -> User:
@@ -48,7 +47,7 @@ class UserRepository(BaseRepository[User]):
         sqla_obj = await self.session.execute(stmt)
         user_info = sqla_obj.scalar_one_or_none()
         if not user_info:
-            raise RecordNotFound(email, self.MODEL, 'email')
+            raise RecordNotFound(email, self.MODEL.__tablename__, 'email')
         return user_info
 
     async def update_default_info(self, user_id, update_user: UserDtoUpdateDefaultInfo) -> User:

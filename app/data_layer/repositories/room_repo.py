@@ -2,7 +2,6 @@ from uuid import UUID
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.shared.dto.room import RoomDtoUpdate, RoomMemberDtoSave, RoomDtoSave
@@ -21,12 +20,12 @@ class RoomRepository(BaseRepository[Room]):
             RoomMemberDtoSave: RoomMember
         })
 
-    async def get_rooms(self, with_relation: bool = False) -> list[Room]:
+    async def get_rooms(self, limit: int, offset: int, with_relation: bool = False) -> list[Room]:
         """Получение списка комнат"""
         options = None
         if with_relation:
             options = self._with_room_options()
-        result = await self._get(options)
+        result = await self._get(limit, offset, options)
         return result
 
     async def get_member_in_room(self, room_id: UUID, with_relation: bool = False) -> list[RoomMember]:
@@ -53,6 +52,21 @@ class RoomRepository(BaseRepository[Room]):
         await self.session.flush()
         return orm_model
 
+    async def remove_member_in_room(self, room_id: UUID, user_id: str) -> RoomMember:
+        """Удаление участника из комнаты"""
+        stmt = (
+            select(self.ROOM_MEMBER_MODEL)
+            .where(
+                self.ROOM_MEMBER_MODEL.room_id == room_id,
+                self.ROOM_MEMBER_MODEL.user_id == user_id
+            )
+        )
+        sqla_obj = await self.session.execute(stmt)
+        room_member = sqla_obj.scalar_one_or_none()
+        if not room_member:
+            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL.__tablename__, 'id')
+        return room_member
+
     async def update_room(self, room_id: UUID, update_room: RoomDtoUpdate) -> Room:
         """Обновление информации о комнате"""
         result = await self.update(room_id, update_room)
@@ -71,7 +85,7 @@ class RoomRepository(BaseRepository[Room]):
         sqla_obj = await self.session.execute(stmt)
         member = sqla_obj.scalar_one_or_none()
         if not member:
-            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL, 'id')
+            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL.__tablename__, 'id')
         member.role = new_role
         return member
 
@@ -80,7 +94,7 @@ class RoomRepository(BaseRepository[Room]):
         return [
             joinedload(self.MODEL.owner),
             selectinload(self.MODEL.members),
-            joinedload(self.MODEL.chat)
+            selectinload(self.MODEL.chats)
         ]
 
     def _with_room_member_options(self):
