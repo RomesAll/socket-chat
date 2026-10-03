@@ -3,7 +3,7 @@ import json
 from uuid import UUID
 from redis.asyncio import Redis
 from app.business_logic.redis_adapter.exception_handler import exception_handler
-from app.shared.dto.message import MessageDtoGet
+from app.shared.dto.message import MessageDtoCreate, MessageDtoGetWithBodyEncrypted
 from app.shared.dto.room import RoomDtoGet
 from app.shared.dto.user import UserDtoGet
 
@@ -80,7 +80,7 @@ class Cache:
         return user_info
 
     @exception_handler(generate_exc=False)
-    async def save_chat_msg_info(self, msg_info: MessageDtoGet, ttl_seconds: int = 3600 * 24) -> int:
+    async def save_chat_msg_info(self, msg_info: MessageDtoGetWithBodyEncrypted, ttl_seconds: int = 3600 * 24) -> int:
         """Сохранение информации о сообщении в кеш"""
         date = msg_info.created_at.date().isoformat()
         key = f'{self._chat_msg}:{msg_info.chat_id}:history:{date}'
