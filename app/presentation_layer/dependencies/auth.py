@@ -1,16 +1,16 @@
-from typing import Generic
+from typing import Generic, TypeVar
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidSignatureError, DecodeError
 from starlette import status
 from app.business_logic.jwt_manager import JWTAccessManager, JWTRefreshManager
 from app.data_layer.models import RoleEnum
-from app.shared.dto.base import TToken
 from app.shared.dto.jwt import JWTBaseToken
 import jwt
 from app.shared.dto.jwt import TokenType, JWTAccessTokenResponse, JWTRefreshTokenResponse
 
 
+TToken = TypeVar('TToken', bound=JWTBaseToken)
 security = HTTPBearer()
 
 
