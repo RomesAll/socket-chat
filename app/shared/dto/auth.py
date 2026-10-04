@@ -35,3 +35,9 @@ class VerifyCodeRequest(BaseModel):
 class RefreshVerifyCodeRequest(BaseModel):
     """DTO для обновления кода"""
     user_id: str
+
+
+class VerifyCodeResponse(BaseModel):
+    """Класс для получения access и refresh токенов"""
+    access_token: str
+    refresh_token: str
