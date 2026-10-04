@@ -27,6 +27,15 @@ class UserDtoInfoSave(BaseModel):
         return self
 
 
+class UserRegister(BaseModel):
+    """DTO для регистрации пользователя"""
+    id: str
+    display_name: str
+    email: str
+    password: str
+    repeat_password: str
+
+
 class UserDtoUpdateDefaultInfo(BaseModel):
     """DTO для хранения и валидации информации об обновлении сущ. пользователя"""
     display_name: str | None = None
