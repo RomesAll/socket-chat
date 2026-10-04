@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from starlette import status
 from starlette.responses import JSONResponse
-from app.business_logic.services import UserService
+from app.business_logic.services import AuthService, UserService
 from app.data_layer.models import RoleEnum
 from app.presentation_layer.dependencies.auth import AuthChecker
-from app.presentation_layer.dependencies.base import get_user_service
+from app.presentation_layer.dependencies.base import get_auth_service, get_user_service
 from app.shared.dto import UserDtoSave
 from app.shared.dto.auth import LoginDtoRequest, SendType
 from app.shared.dto.jwt import JWTRefreshTokenResponse, TokenType, JWTTokenResponse
@@ -25,9 +25,9 @@ bootstrap = get_bootstrap()
 async def login_user(
         credentials: LoginDtoRequest,
         type_send: SendType = SendType.EMAIL,
-        user_service: UserService = Depends(get_user_service)
+        auth_service: AuthService = Depends(get_auth_service)
 ):
-    result = await user_service.login(credentials, type_send)
+    result = await auth_service.login(credentials, type_send)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -83,9 +83,9 @@ async def refresh_tokens(
                 allowed_roles=[RoleEnum.DEFAULT_USER, RoleEnum.SUPER_ADMIN]
             ),
         ),
-        user_service: UserService = Depends(get_user_service)
+        auth_service: AuthService = Depends(get_auth_service)
 ):
-    result: JWTTokenResponse = await user_service.refresh_token(token_info)
+    result: JWTTokenResponse = await auth_service.refresh_token(token_info)
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={
@@ -110,9 +110,9 @@ async def logout_user_operation(
                 allowed_roles=[RoleEnum.DEFAULT_USER, RoleEnum.SUPER_ADMIN]
             ),
         ),
-        user_service: UserService = Depends(get_user_service)
+        auth_service: AuthService = Depends(get_auth_service)
 ):
-    await user_service.logout(
+    await auth_service.logout(
         user_id=token_info.user_id,
         session_id=token_info.session_id,
         ref_token_id=token_info.refresh_id
