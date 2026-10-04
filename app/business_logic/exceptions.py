@@ -1,6 +1,28 @@
 from uuid import UUID
 
 
+class VerifyCodeInCorrect(Exception):
+    """Введенный код подтверждения неверный"""
+    def __init__(self,):
+        self.message = 'Введенный код подтверждения неверный'
+        super().__init__(self.message)
+
+
+class VerifyCodeStorageError(Exception):
+    """Не удалось получить код подтверждения из кеша"""
+    def __init__(self,):
+        self.message = ('Не удалось найти код подтверждения, '
+                        'т.к. сервис временно недоступен')
+        super().__init__(self.message)
+
+
+class SaveIdRefreshTokenWhiteListError(Exception):
+    """Неудачная попытка сохранения id refresh токена"""
+    def __init__(self, user_id: str):
+        self.message = f'Не удалось сохранить id refresh токена пользователя {user_id} в white list'
+        super().__init__(self.message)
+
+
 class RefreshTokenInActive(Exception):
     """Refresh токен больше не активен"""
     def __init__(self, user_id: str, token_id):
