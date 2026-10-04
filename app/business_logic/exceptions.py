@@ -1,6 +1,14 @@
 from uuid import UUID
 
 
+class RefreshTokenInActive(Exception):
+    """Refresh токен больше не активен"""
+    def __init__(self, user_id: str, token_id):
+        self.user_id = user_id
+        self.message = f'Refresh токен больше не активен для пользователя {user_id}, токен id: {token_id}'
+        super().__init__(self.message)
+
+
 class RedisConnectionError(Exception):
     """Сервер Redis выключен, упал, или указан неверный хост/порт"""
     def __init__(self, url: str, cause: str):
