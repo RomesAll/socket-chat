@@ -85,23 +85,19 @@ class Message(UuidIsMixin, Base):
     chat_id: Mapped[UUID] = mapped_column(
         ForeignKey('chat.id', ondelete='CASCADE'),
     )
-    sender_id: Mapped[str] = mapped_column(
-        ForeignKey('user.id', ondelete='CASCADE'),
+    sender_id: Mapped[str | None] = mapped_column(
+        ForeignKey('user.id', ondelete='SET NULL'),
+        nullable=True,
     )
     body_encrypted: Mapped[str]
     type: Mapped[MessageType]
     reply_to_message_id: Mapped[UUID] = mapped_column(default=None, nullable=True)
     forwarded_from_message_id: Mapped[UUID] = mapped_column(default=None, nullable=True)
-    forwarded_from_user_id: Mapped[str] = mapped_column(
-        ForeignKey('user.id', ondelete='CASCADE'),
-        default=None,
-        nullable=True
+    forwarded_from_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey('user.id', ondelete='SET NULL'),
+        nullable=True,
     )
     is_edited: Mapped[bool] = mapped_column(default=False)
-    is_deleted: Mapped[bool] = mapped_column(default=False)
-    deleted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
 
 
 class MessageAttachment(UuidIsMixin, Base):

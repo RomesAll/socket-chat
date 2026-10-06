@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import LargeBinary, ForeignKey
+from sqlalchemy import LargeBinary, ForeignKey, DateTime
 from sqlalchemy.orm import mapped_column, Mapped
 from .base import Base, StrIdMixin
 
@@ -18,6 +18,10 @@ class User(StrIdMixin, Base):
     avatar_url: Mapped[str] = mapped_column(
         default=None,
         nullable=True
+    )
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
     )
 
 
