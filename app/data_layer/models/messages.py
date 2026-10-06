@@ -1,10 +1,10 @@
 from datetime import datetime
 from pathlib import Path
-from sqlalchemy import ForeignKey, DateTime, func, String
-from sqlalchemy.orm import mapped_column, Mapped, relationship
+from sqlalchemy import ForeignKey, DateTime, String
+from sqlalchemy.orm import mapped_column, Mapped
 from enum import Enum
 from uuid import UUID
-from .base import Base, UuidIsMixin, IntIdMixin
+from .base import Base, UuidIsMixin
 
 
 class MessageType(str, Enum):
@@ -102,10 +102,6 @@ class Message(UuidIsMixin, Base):
     deleted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    message_file: Mapped[list['MessageAttachment']] = relationship(
-        back_populates='message_info',
-        cascade='all, delete-orphan'
-    )
 
 
 class MessageAttachment(UuidIsMixin, Base):
@@ -117,9 +113,6 @@ class MessageAttachment(UuidIsMixin, Base):
     file_path: Mapped[str]
     mime_type: Mapped[str]
     size: Mapped[int]
-    message_info: Mapped['Message'] = relationship(
-        back_populates='message_file'
-    )
 
     @property
     def file(self) -> Path:

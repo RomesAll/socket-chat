@@ -1,12 +1,8 @@
-from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import mapped_column, Mapped, relationship
+from sqlalchemy.orm import mapped_column, Mapped
 from enum import Enum
 from uuid import UUID
 from .base import Base, UuidIsMixin
-
-if TYPE_CHECKING:
-    from .rooms import Room
 
 
 class ChatType(str, Enum):
@@ -18,13 +14,12 @@ class ChatType(str, Enum):
 class Chat(UuidIsMixin, Base):
     """Orm модель для хранения информации о чатах"""
     name: Mapped[str]
-    room_id: Mapped[UUID] = mapped_column(
+    room_id: Mapped[UUID | None] = mapped_column(
         ForeignKey('room.id', ondelete='CASCADE'),
         nullable=True,
         default=None
     )
-    room: Mapped['Room'] = relationship(back_populates='chats')
-    members: Mapped[list['ChatMember']] = relationship(back_populates='chat', cascade='all, delete-orphan',)
+    is_private: Mapped[bool] = mapped_column(default=False)
 
 
 class ChatMember(Base):
@@ -42,4 +37,3 @@ class ChatMember(Base):
         nullable=True
     )
     mute: Mapped[bool] = mapped_column(default=False)
-    chat: Mapped['Chat'] = relationship(back_populates='members')

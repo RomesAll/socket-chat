@@ -1,12 +1,8 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING
 from sqlalchemy import LargeBinary, ForeignKey
-from sqlalchemy.orm import mapped_column, Mapped, relationship
+from sqlalchemy.orm import mapped_column, Mapped
 from .base import Base, StrIdMixin
-
-if TYPE_CHECKING:
-    from .rooms import RoomMember, Room
 
 
 class RoleEnum(str, Enum):
@@ -23,21 +19,6 @@ class User(StrIdMixin, Base):
         default=None,
         nullable=True
     )
-    user_info: Mapped["UserInfo"] = relationship(
-        back_populates="user",
-        uselist=False,
-        cascade="all, delete-orphan",
-        single_parent=True,
-    )
-    room_members: Mapped[list['RoomMember']] = relationship(
-        back_populates='user',
-        cascade='all, delete-orphan',
-    )
-    owned_rooms: Mapped[list['Room']] = relationship(
-        back_populates='owner',
-        cascade='all, delete-orphan',
-        foreign_keys='Room.owner_id',
-    )
 
 
 class UserInfo(Base):
@@ -49,4 +30,3 @@ class UserInfo(Base):
     email: Mapped[str] = mapped_column(unique=True)
     password: Mapped[bytes] = mapped_column(LargeBinary(60))
     last_seen_at: Mapped[datetime] = mapped_column(default=None, nullable=True)
-    user: Mapped['User'] = relationship(back_populates='user_info')
