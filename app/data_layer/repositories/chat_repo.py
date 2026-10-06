@@ -1,11 +1,11 @@
+from typing import Sequence
 from uuid import UUID
 from sqlalchemy import select, and_, delete
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base import BaseRepository
 from app.data_layer.models import Chat, ChatMember
-from app.shared.dto.chat import ChatDtoSave, ChatMemberDtoSave, ChatMemberDtoUpdate
+from app.shared.dto.chat import ChatMemberDtoSave, ChatMemberDtoUpdate
 
 
 class ChatRepository(BaseRepository[Chat]):
@@ -13,113 +13,112 @@ class ChatRepository(BaseRepository[Chat]):
     MODEL: type[Chat] = Chat
     CHAT_MEMBER_MODEL: type[ChatMember] = ChatMember
 
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-        self.MAPPING_DTO_ORM_SAVE.update({
-            ChatDtoSave: Chat,
-            ChatMemberDtoSave: ChatMember
-        })
-
-    async def get_chat_by_id(self, chat_id: UUID, with_relation: bool = False) -> Chat:
-        """Получение чата по id"""
-        options = None
-        if with_relation:
-            options = self._with_chat_options()
-        result = await self._get_by_id(chat_id, options)
-        return result
-
-    async def get_user_chats(self, user_id: str) -> list[ChatMember]:
-        """Получение информации о чатах, в которых состоит пользователь"""
+    async def get_user_chats(self, user_id: str) -> Sequence[ChatMember]:
+        """
+        Получение информации о чатах, в которых состоит пользователь
+        :param user_id: идентификатор пользователя
+        :return: Sequence объекты orm модели ChatMember
+        """
         stmt = (
             select(self.CHAT_MEMBER_MODEL)
             .where(self.CHAT_MEMBER_MODEL.user_id == user_id)
-            .options(joinedload(self.CHAT_MEMBER_MODEL.chat))
         )
-        sqla_obj = await self.session.execute(stmt)
-        chat_member = sqla_obj.scalars().all()
-        return list(chat_member)
+        results = await self.session.scalars(stmt)
+        return results.all()
 
-
-    async def get_chat_by_room(self, room_id: UUID, with_relation: bool = False) -> list[Chat]:
-        """Получение чата по id комнаты"""
+    async def get_chat_by_room(self, room_id: UUID) -> Sequence[Chat]:
+        """
+        Получение информации о чатах в комнате
+        :param room_id: идентификатор комнаты
+        :return: Sequence объекты orm модели Chat
+        """
         stmt = (
             select(self.MODEL)
             .where(self.MODEL.room_id == room_id)
         )
-        if with_relation:
-            stmt = stmt.options(*self._with_chat_options())
-        sqla_obj = await self.session.execute(stmt)
-        results = sqla_obj.scalars().all()
-        return list(results)
+        results = await self.session.scalars(stmt)
+        return results.all()
 
-    async def get_chat_members(self, chat_id: UUID, with_relation: bool = False) -> list[ChatMember]:
-        """Получение участников чата"""
+    async def get_chat_members(self, chat_id: UUID) -> Sequence[ChatMember]:
+        """
+        Получение информации об участниках чата
+        :param chat_id: идентификатор чата
+        :return: Sequence объекты orm модели Chat
+        """
         stmt = (
             select(self.CHAT_MEMBER_MODEL)
             .where(self.CHAT_MEMBER_MODEL.chat_id == chat_id)
         )
-        if with_relation:
-            stmt = stmt.options(*self._with_chat_options())
-        sqla_obj = await self.session.execute(stmt)
-        results = sqla_obj.scalars().all()
-        return list(results)
+        results = await self.session.scalars(stmt)
+        return results.all()
 
-    async def add_chat_member(self, chat_member: ChatMemberDtoSave) -> ChatMember:
-        """Добавление участника чата"""
+    async def add_chat_member(self, chat_id: UUID, user_id: str) -> ChatMember:
+        """
+        Добавление нового участника в чат
+        :param user_id: идентификатор пользователя
+        :param chat_id: идентификатор чата
+        :return: новый объект orm модели ChatMember
+        """
         new_chat_member = self.CHAT_MEMBER_MODEL(
-            **chat_member.model_dump()
+            chat_id=chat_id,
+            user_id=user_id
         )
         self.session.add(new_chat_member)
         return new_chat_member
 
-    async def remove_chat_member(self, chat_id: UUID, user_id: str) -> int:
-        """Удаление участника чата"""
-        stmt = (
-            delete(self.CHAT_MEMBER_MODEL)
-            .where(and_(
+    async def remove_chat_member(self, chat_id: UUID, user_id: str) -> ChatMember:
+        """
+        Удалить участника из комнаты
+        :param user_id: идентификатор пользователя
+        :param chat_id: идентификатор чата
+        :return: удаленный объекты orm модели ChatMember
+        """
+        stmt_exist = (
+            select(self.CHAT_MEMBER_MODEL)
+            .where(
                 self.CHAT_MEMBER_MODEL.user_id == user_id,
-                self.CHAT_MEMBER_MODEL.chat_id == chat_id,
-            ))
-            .returning(self.CHAT_MEMBER_MODEL.user_id)
+                self.CHAT_MEMBER_MODEL.chat_id == chat_id
+            )
         )
-        sqla_obj = await self.session.execute(stmt)
-        deleted = sqla_obj.scalars().all()
-        if not deleted:
-            raise RecordNotFound(chat_id, self.MODEL.__tablename__, 'id')
-        return len(deleted)
+        chat_member = await self.session.scalar(stmt_exist)
+        if not chat_member:
+            raise RecordNotFound(
+                [user_id, chat_id],
+                self.CHAT_MEMBER_MODEL.__tablename__,
+                'user_id, chat_id'
+            )
+        await self.session.delete(chat_member)
+        return chat_member
 
-    async def update_member(self, chat_id: UUID, user_id: str, update_member: ChatMemberDtoUpdate) -> ChatMember:
-        """Обновления участника чата"""
+    async def update_member(
+            self, chat_id: UUID, user_id: str, update_member: ChatMemberDtoUpdate
+    ) -> ChatMember:
+        """
+        Обновления участника чата
+        :param user_id: идентификатор пользователя
+        :param chat_id: идентификатор чата
+        :param update_member: dto с полями для обновления
+        :return: обновленный объекты orm модели ChatMember
+        """
         raw_data = update_member.model_dump(
             exclude_unset=True,
             exclude_none=True,
             exclude_defaults=True
         )
-        stmt = (
+        stmt_exist = (
             select(self.CHAT_MEMBER_MODEL)
             .where(
-                and_(
-                    self.CHAT_MEMBER_MODEL.chat_id == chat_id,
-                    self.CHAT_MEMBER_MODEL.user_id == user_id
-                )
+                self.CHAT_MEMBER_MODEL.user_id == user_id,
+                self.CHAT_MEMBER_MODEL.chat_id == chat_id
             )
         )
-        sqla_obj = await self.session.execute(stmt)
-        member_info = sqla_obj.scalar_one_or_none()
-        if not member_info:
-            raise RecordNotFound(f'чат={chat_id}, user={user_id}', self.MODEL.__tablename__, 'id')
+        chat_member = await self.session.scalar(stmt_exist)
+        if not chat_member:
+            raise RecordNotFound(
+                [user_id, chat_id],
+                self.CHAT_MEMBER_MODEL.__tablename__,
+                'user_id, chat_id'
+            )
         for k, v in raw_data.items():
-            setattr(member_info, k, v)
-        return member_info
-
-    def _with_chat_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            selectinload(self.MODEL.members),
-        ]
-
-    def _with_chat_members_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            joinedload(self.CHAT_MEMBER_MODEL.chat),
-        ]
+            setattr(chat_member, k, v)
+        return chat_member
