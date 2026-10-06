@@ -1,96 +1,68 @@
 from pydantic import BaseModel
-from sqlalchemy import select, inspect
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import TypeVar, Generic, Any
-from app.data_layer.exceptions import RecordNotFound, OrmModelNotFound
+from typing import TypeVar, Generic, Any, Sequence
+from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.models import Base
 from app.data_layer.repositories.metaclass_repo import RepoMeta
+
 
 TOrmModel = TypeVar('TOrmModel', bound=Base)
 
 
 class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
+    """Базовый репозиторий для работы с данными"""
     MODEL: type[Base] = Base
-    MAPPING_DTO_ORM_SAVE = {}
 
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    @classmethod
-    def dto_to_orm(cls, dto: BaseModel) -> TOrmModel:
+    async def get_records(self, limit: int, offset: int) -> Sequence[TOrmModel]:
         """
-        Конвертация из dto модели в orm объекты с учетом вложенных
-        атрибутов. Обход вложенных атрибутов осуществляется через рекурсию.
-
-        Алгоритм:\n
-        - Проверяем что переданный dto это объект pydantic
-        - С помощью маппинга получаем orm модель для типа pydantic (если нет, то ошибка)
-        - Формирует результирующую коллекцию raw_data
-        - Итерируемся по атрибутам dto
-        - На каждой итерации получаем значение атрибута и проверяем
-        - Если атрибут не коллекция, то просто добавляем как есть в raw_data
-        - Если атрибут коллекция, то для него вызываем нашу функцию рекурсивно и передаем вложенную коллекцию
-        - В результате рекурсивный алгоритм создает orm объект по raw_data и возвращает его вверх по рекурсии
-        :param dto:
-        :return:
+        Получение из БД список записей с помощью пагинации
+        :param limit: кол-во записей
+        :param offset: пропустить кол-во записей
+        :return: Sequence объекты orm модели sqlalchemy
         """
-        if not isinstance(dto, BaseModel):
-            raise TypeError('Для сохранения данных в таблицу через '
-                            'репозиторий необходимо передать объект BaseModel')
-        model = cls.MAPPING_DTO_ORM_SAVE.get(type(dto), None)
-        if not model:
-            raise OrmModelNotFound(dto)
-        raw_data = {}
-        model_field_info =  [attr.key for attr in inspect(model).attrs]
-        for field in dto.model_fields.keys():
-            value = getattr(dto, field)
-            if field not in model_field_info or value is None:
-                continue
-            if isinstance(value, (list, tuple, set, BaseModel)):
-                orm_nested = None
-                if isinstance(value, BaseModel):
-                    orm_nested = cls.dto_to_orm(value)
-                elif isinstance(value, (list, tuple, set)):
-                    orm_nested = [cls.dto_to_orm(record) for record in value]
-                raw_data[field] = orm_nested
-            else:
-                raw_data[field] = value
-        orm_model = model(**raw_data)
-        return orm_model
-
-    async def _get(self, limit: int, offset: int, relation: list | None = None) -> list[TOrmModel]:
-        """Получение списка записей из бд"""
         stmt = (
             select(self.MODEL)
             .limit(limit)
             .offset(offset)
         )
-        if relation:
-            stmt = stmt.options(*relation)
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        result = await self.session.scalars(stmt)
+        return result.all()
 
-    async def _get_by_id(self, record_id: Any, relation: list | None = None) -> TOrmModel:
-        """Получение записи по id"""
+    async def get_record_by_id(self, record_id: Any) -> TOrmModel:
+        """
+        Получение из БД записи по уникальному идентификатору
+        :param record_id: идентификатор записи
+        :return: объект orm модели sqlalchemy
+        """
         stmt = select(self.MODEL).where(self.MODEL.id == record_id)
-        if relation:
-            stmt = stmt.options(*relation)
-        sqla_obj = await self.session.execute(stmt)
-        result = sqla_obj.scalar_one_or_none()
+        result = await self.session.scalar(stmt)
         if not result:
             raise RecordNotFound(record_id, self.MODEL.__tablename__, 'id')
         return result
 
     async def save(self, request: BaseModel) -> TOrmModel:
-        """Сохранение новой записи в бд"""
-        orm_model = self.dto_to_orm(request)
+        """
+        Сохранение новой записи в БД
+        :param request: pydantic модель
+        :return: сохраненный объект orm модели sqlalchemy
+        """
+        orm_model = self.MODEL(**request.model_dump())
         self.session.add(orm_model)
         await self.session.flush()
         return orm_model
 
     async def update(self, record_id: Any, request: BaseModel) -> TOrmModel:
-        """Обновление существующей записи в бд"""
-        record_info = await self._get_by_id(record_id)
+        """
+        Обновление существующей записи в БД
+        :param record_id: идентификатор записи
+        :param request: pydantic модель
+        :return: обновленный объект orm модели sqlalchemy
+        """
+        record_info = await self.get_record_by_id(record_id)
         raw_data = request.model_dump(
             exclude_none=True,
             exclude_unset=True,
@@ -98,10 +70,15 @@ class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
         )
         for k, v in raw_data.items():
             setattr(record_info, k, v)
+        await self.session.flush()
         return record_info
 
     async def delete(self, record_id: Any) -> TOrmModel:
-        """Удаление записи из бд"""
-        record_info = await self._get_by_id(record_id)
+        """
+        Удаление существующей записи из БД
+        :param record_id: идентификатор записи
+        :return: удаленный объект orm модели sqlalchemy
+        """
+        record_info = await self.get_record_by_id(record_id)
         await self.session.delete(record_info)
         return record_info
