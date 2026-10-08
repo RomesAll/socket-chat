@@ -48,3 +48,17 @@ class RoomRepository(
         :return: Объект ORM модели Room или None, если комнаты нет.
         """
         return await self.session.get(self.MODEL, room_id)
+
+    async def get_owner_room(self, room_id: UUID) -> str | None:
+        """
+        Получить идентификатор владельца комнаты или None.
+
+        Возвращает None, если комната существует, но владелец не задан.
+        Кидает RecordNotFound, если комнаты с таким id нет.
+
+        :param room_id: Идентификатор комнаты.
+        :return: ID владельца или None, если владелец не задан.
+        :raises RecordNotFound: Если комнаты с таким id не существует.
+        """
+        room_info = await self.get_record_by_id(room_id)
+        return room_info.owner_id

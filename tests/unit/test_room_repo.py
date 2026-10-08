@@ -38,7 +38,7 @@ async def test_change_owner_success(db_session):
 
 async def test_change_owner_room_not_found(db_session):
     """
-    Тест: Получения исключения RecordNotFound при смене
+    Тест: Получение исключения RecordNotFound при смене
     владельца в несуществующей комнате.
     """
     repo = RoomRepository(db_session)
@@ -68,3 +68,30 @@ async def test_find_by_id_returns_none(db_session):
     repo = RoomRepository(db_session)
     result = await repo.find_by_id(room_id=uuid4())
     assert result is None
+
+
+async def test_get_owner_by_id_room_returns_when_exists(db_session):
+    """Тест: Получения ID владельца комнаты."""
+    user_id = uuid4()
+    new_user = User(id=user_id, display_name="New Owner", email="new@test.com", password=b"123")
+    db_session.add(new_user)
+    await db_session.commit()
+
+    room_id = uuid4()
+    test_room = Room(id=room_id, name="Тестовая комната", owner_id=user_id)
+    db_session.add(test_room)
+    await db_session.commit()
+
+    repo = RoomRepository(db_session)
+    result = await repo.get_owner_room(room_id=room_id)
+    assert result == user_id
+
+
+async def test_get_owner_by_id_room_not_found(db_session):
+    """
+    Тест: Генерация исключения RecordNotFound при получении
+    владельца несуществующей комнаты
+    """
+    repo = RoomRepository(db_session)
+    with pytest.raises(RecordNotFound):
+        await repo.get_owner_room(room_id=uuid4())
