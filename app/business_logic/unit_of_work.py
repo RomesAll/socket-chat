@@ -3,6 +3,7 @@ from app.data_layer.models.events import OutboxEvent, Status, EventType
 from app.data_layer.repositories import MessageRepository, ChatRepository, RoomRepository, UserRepository
 from mongotic.asyncio import AsyncSession as MongoSession
 from sqlalchemy.ext.asyncio import AsyncSession as SqlAsyncSession
+from app.data_layer.repositories.invite_url_repo import InviteUrlRepo
 
 
 class UnitOfWork:
@@ -14,6 +15,8 @@ class UnitOfWork:
         self.chat_repo = ChatRepository(self.sql_session)
         self.room_repo = RoomRepository(self.sql_session)
         self.user_repo = UserRepository(self.sql_session)
+        if self.mongo_session:
+            self.invite_url_repo = InviteUrlRepo(self.mongo_session)
         self._events = []
 
     async def __aenter__(self):
@@ -30,11 +33,20 @@ class UnitOfWork:
             if self.mongo_session:
                 await self.mongo_session.close()
 
-    def add_event(self, event_name: str, payload: dict, event_type: EventType):
+    def add_event(
+            self,
+            event_name: str,
+            payload: dict,
+            event_type: EventType,
+            is_save_stat: bool = True,
+            is_save_audit: bool = True
+    ):
         self._events.append({
             'event_name': event_name,
             'payload': payload,
-            'event_type': event_type
+            'event_type': event_type,
+            'is_save_stat': is_save_stat,
+            'is_save_audit': is_save_audit
         })
 
     async def commit(self):
@@ -46,8 +58,9 @@ class UnitOfWork:
                 event_orm = OutboxEvent(
                     event_name=event["event_name"],
                     payload=event["payload"],
-                    status=Status.NEW,
-                    type=event['event_type']
+                    type=event['event_type'],
+                    is_save_stat=event['is_save_stat'],
+                    is_save_audit=event['is_save_audit']
                 )
                 self.mongo_session.add(event_orm)
         await self.sql_session.commit()
