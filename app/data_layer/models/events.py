@@ -30,6 +30,8 @@ class EventType(str, Enum):
     ADD_MEMBER_IN_ROOM = 'ADD_MEMBER_IN_ROOM'
     REMOVE_MEMBER_IN_ROOM = 'REMOVE_MEMBER_IN_ROOM'
 
+    GENERATE_INVITE_TOKEN = 'GENERATE_INVITE_TOKEN'
+    CHANGE_OWNER_IN_ROOM = 'CHANGE_OWNER_IN_ROOM'
 
 class Status(str, Enum):
     """Перечисление статусов событий"""
@@ -44,6 +46,8 @@ class OutboxEvent(MongoBaseModel):
     __databasename__ = "messenger_db"
     __tablename__ = "outbox_events"
 
+    is_save_stat: Mapped[bool] = mapped_field(default=True, description='Сохранить ли событие в статистику')
+    is_save_audit: Mapped[bool] = mapped_field(default=True, description='Сохранить ли событие в аудит')
     event_name: Mapped[str] = mapped_field(description="Название события, например: MessageSentEvent")
     payload: Mapped[dict] = mapped_field(description="Полезная нагрузка (payload) события в виде JSON/dict")
     status: Mapped[Status] = mapped_field(default=Status.NEW, description="Статус: NEW, PROCESSED, FAILED")
