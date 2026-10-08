@@ -14,8 +14,10 @@ TOrmModel = TypeVar('TOrmModel', bound=Base)
 
 class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
     """
-    Базовый класс репозитория для определения модели, сохранения
-    сессии и базовым методом получения записи по id
+    Базовый класс репозитория.
+
+    Определяет ORM модель, сохраняет асинхронную сессию базы данных и
+    служит основой для специализированных CRUD репозиториев.
     """
 
     MODEL: type[TOrmModel]
@@ -23,27 +25,35 @@ class BaseRepository(Generic[TOrmModel], metaclass=RepoMeta):
     def __init__(self, session: AsyncSession):
         self.session = session
 
+
+class BaseGetRepository(BaseRepository[TOrmModel]):
+    """
+    Базовый класс репозитория для чтения записей.
+
+    Определяет базовый метод для получения записи по ID и списков объектов
+    из базы данных с поддержкой пагинации
+    """
+
     async def get_record_by_id(self, record_id: Any) -> TOrmModel:
         """
-        Получение из БД записи по уникальному идентификатору
-        :param record_id: идентификатор записи
-        :return: объект orm модели sqlalchemy
+        Получить запись из базы данных по её уникальному идентификатору (ID).
+
+        :param record_id: Идентификатор записи.
+        :return: Объект ORM модели из базы данных.
+        :raise RecordNotFound: Если запись с указанным ID не найдена в таблице.
         """
         result: TOrmModel | None = await self.session.get(self.MODEL, record_id)
         if result is None:
             raise RecordNotFound([record_id], self.MODEL.__tablename__, 'id')
         return result
 
-
-class BaseGetRepository(BaseRepository[TOrmModel]):
-    """Базовый репозиторий для получения данных"""
-
     async def get_records(self, limit: int, offset: int) -> Sequence[TOrmModel]:
         """
-        Получение из БД список записей с помощью пагинации
-        :param limit: кол-во записей
-        :param offset: пропустить кол-во записей
-        :return: Sequence объекты orm модели sqlalchemy
+        Получить список записей из базы данных с помощью пагинации.
+
+        :param limit: Максимальное количество возвращаемых записей.
+        :param offset: Количество записей, которое необходимо пропустить.
+        :return: Список ORM моделей, обернутый в Sequence.
         """
         stmt = (
             select(self.MODEL)
@@ -56,14 +66,22 @@ class BaseGetRepository(BaseRepository[TOrmModel]):
 
 
 class BaseSaveRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TSaveDto]):
-    """Базовый репозиторий для сохранения данных"""
+    """
+    Базовый класс репозитория для создания записей в базе данных.
+
+    Определяет стандартный метод для инициализации ORM-модели
+    на основе переданного объекта DTO и её сохранения в сессии.
+    """
 
     async def save(self, request: TSaveDto) -> TOrmModel:
         """
-        Сохранение новой записи в БД
-        :param request: поля которые нужно сохранить
-        :return: сохраненный объект orm модели sqlalchemy
+        Сохранить новую запись в базе данных.
+
+        :param request: Объект DTO с валидированными данными для создания записи.
+        :return: Созданный и добавленный в сессию объект ORM-модели.
         """
+        # exclude_unset=True удаляет базовые значения pydantic,
+        # для того, чтобы база данных применила свои базовые значения
         orm_model = self.MODEL(**request.model_dump(exclude_unset=True))
         self.session.add(orm_model)
         await self.session.flush()
@@ -71,16 +89,26 @@ class BaseSaveRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TSaveDto]
 
 
 class BaseUpdateRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TUpdateDto]):
-    """Базовый репозиторий для обновления данных"""
+    """
+    Базовый класс репозитория для обновления записей в базе данных.
+
+    Определяет стандартный метод для обновления существующей записи на
+    основе переданного объекта DTO с валидированными данными.
+    """
 
     async def update(self, record_id: Any, request: TUpdateDto) -> TOrmModel:
         """
-        Обновление существующей записи в БД
-        :param record_id: идентификатор записи
-        :param request: поля которые нужно обновить
-        :return: обновленный объект orm модели sqlalchemy
+        Обновить существующую запись в базе данных по
+        идентификатору записи (ID).
+
+        :param record_id: Идентификатор записи
+        :param request: Объект DTO с валидированными данными для обновления записи.
+        :return: Обновленная ORM-модель в сессии.
+        :raise RecordNotFound: Если запись с указанным ID не найдена в таблице.
         """
-        record_info: TOrmModel = await self.get_record_by_id(record_id)
+        record_info: TOrmModel | None = await self.session.get(self.MODEL, record_id)
+        if record_info is None:
+            raise RecordNotFound([record_id], self.MODEL.__tablename__, 'id')
         raw_data = request.model_dump(exclude_unset=True)
         for k, v in raw_data.items():
             setattr(record_info, k, v)
@@ -89,15 +117,24 @@ class BaseUpdateRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TUpdate
 
 
 class BaseDeleteRepository(BaseRepository[TOrmModel]):
-    """Базовый репозиторий для удаления данных"""
+    """
+    Базовый класс репозитория для удаления записей из базы данных.
+
+    Определяет стандартный метод для удаления записи по
+    идентификатору записи (ID).
+    """
 
     async def delete(self, record_id: Any) -> TOrmModel:
         """
-        Удаление существующей записи из БД
-        :param record_id: идентификатор записи
-        :return: удаленный объект orm модели sqlalchemy
+        Удалить существующую запись из базы данных по ее
+        уникальному идентификатору.
+
+        :param record_id: Идентификатор записи.
+        :return: Удаленная ORM-модель из сессии.
         """
-        record_info: TOrmModel = await self.get_record_by_id(record_id)
+        record_info: TOrmModel | None = await self.session.get(self.MODEL, record_id)
+        if record_info is None:
+            raise RecordNotFound([record_id], self.MODEL.__tablename__, 'id')
         await self.session.delete(record_info)
         await self.session.flush()
         return record_info
