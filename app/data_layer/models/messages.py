@@ -1,6 +1,5 @@
-from datetime import datetime
 from pathlib import Path
-from sqlalchemy import ForeignKey, DateTime, String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import mapped_column, Mapped
 from enum import Enum
 from uuid import UUID
@@ -16,6 +15,7 @@ class MessageType(str, Enum):
 
 
 class MimeType(str, Enum):
+    """Перечисление mime типов"""
     # ===== Изображения =====
     PNG = "image/png"
     JPEG = "image/jpeg"
@@ -89,7 +89,7 @@ class Message(UuidIsMixin, Base):
         ForeignKey('user.id', ondelete='SET NULL'),
         nullable=True,
     )
-    body_encrypted: Mapped[str]
+    body_encrypted: Mapped[str | None] = mapped_column(default=None, nullable=True)
     type: Mapped[MessageType]
     reply_to_message_id: Mapped[UUID] = mapped_column(default=None, nullable=True)
     forwarded_from_message_id: Mapped[UUID] = mapped_column(default=None, nullable=True)
