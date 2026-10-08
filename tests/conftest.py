@@ -13,7 +13,7 @@ test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestingSessionLocal = async_sessionmaker(bind=test_engine, expire_on_commit=False)
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope='function', autouse=True)
 async def setup_data_base():
     """Создать таблицы перед началом выполнения тестов и удалить после."""
     async with test_engine.begin() as engine:
