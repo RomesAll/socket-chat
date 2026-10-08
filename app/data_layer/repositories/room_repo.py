@@ -1,6 +1,8 @@
 from typing import Sequence
 from uuid import UUID
 from sqlalchemy import select, and_
+
+from app.business_logic.exceptions import OwnerInRoomEmpty
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base_repo import (
     BaseGetRepository,
@@ -166,7 +168,7 @@ class RoomRepository(
         await self.session.flush()
         return room_info
 
-    async def get_room_owner(self, room_id: UUID) -> str | None:
+    async def get_room_owner(self, room_id: UUID) -> str:
         """
         Получение владельца комнаты
         :param room_id: id комнаты
@@ -177,6 +179,8 @@ class RoomRepository(
             .where(self.MODEL.id == room_id)
         )
         result = await self.session.scalar(stmt)
+        if not result:
+            raise OwnerInRoomEmpty(room_id)
         return result
 
     async def get_user_owner_rooms(self, user_id: str) -> Sequence[Room]:
