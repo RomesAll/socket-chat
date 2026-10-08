@@ -28,3 +28,4 @@ class RoomMember(Base):
     room_id: Mapped[UUID] = mapped_column(ForeignKey('room.id', ondelete='CASCADE'), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey('user.id', ondelete='CASCADE'), primary_key=True)
     role: Mapped[RoomRole] = mapped_column(default=RoomRole.MEMBER)
+    is_access_private_chat: Mapped[bool] = mapped_column(default=False)
