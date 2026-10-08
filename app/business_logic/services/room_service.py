@@ -5,6 +5,7 @@ from app.business_logic.redis_adapter import Cache
 from app.data_layer.exceptions import RemoveMemberInRoomPermDenied, RecordNotFound, DeleteRoomPermDenied
 from app.data_layer.models import RoomRole, RoomMember
 from app.business_logic.unit_of_work import UnitOfWork
+from app.data_layer.models.events import EventType
 from app.shared.dto.chat import ChatDtoGet, ChatDtoSave
 from app.shared.dto.room import (
     RoomDtoSave,
@@ -57,6 +58,11 @@ class RoomService(LogMixin):
             result = RoomDtoGetWithChats(
                 **room_orm.to_dict(), chats=[ChatDtoGet(**chat_orm.to_dict())]
             )
+            uow.add_event(
+                event_name='AddNewRoom',
+                event_type=EventType.CRETE_NEW_ROOM,
+                payload=result.model_dump()
+            )
         is_saved = await self._cache.save_room(result)
         if not is_saved:
             self.log_warning(f'Комната {room_dto_save.id} не была сохранена в кеше')
@@ -72,6 +78,12 @@ class RoomService(LogMixin):
             token, exp = await uow.invite_url_repo.generate_url(url_info)
             self.log_info(f'Пользователь {url_info.actor_id} '
                           f'сгенерировал url для вступления в комнату {url_info.room_id}')
+            uow.add_event(
+                event_name='GenerateInviteToken',
+                event_type=EventType.GENERATE_INVITE_TOKEN,
+                payload={'token': token, 'exp': exp},
+                is_save_stat=False
+            )
             return token, exp
 
     async def add_member_in_room(self, url_token: str, member: RoomMemberDtoSave) -> RoomMemberDtoGet:
@@ -91,6 +103,12 @@ class RoomService(LogMixin):
             room_member_orm = await uow.room_repo.add_member_in_room(member)
             self.log_info(f'Пользователь {member.user_id} успешно добавлен в комнату {room_member_orm.room_id}')
             response = RoomMemberDtoGet(**room_member_orm.to_dict())
+            uow.add_event(
+                event_name='AddMemberInRoom',
+                event_type=EventType.ADD_MEMBER_IN_ROOM,
+                payload=response.model_dump(),
+                is_save_stat=False
+            )
             return response
 
     async def remove_member_in_room(self, room_id: UUID, user_id: str, actor_id: str) -> RoomMemberDtoGet:
@@ -129,13 +147,28 @@ class RoomService(LogMixin):
                     await uow.room_repo.delete(room_id)
                     self.log_info(f'При удалении владельца {user_id} была удалена и комната {room_id}, '
                                   f'т.к. в ней больше нет участников')
+                    uow.add_event(
+                        event_name='RemoveRoom',
+                        event_type=EventType.DELETE_ROOM,
+                        payload={'room_id': room_id},
+                    )
                 else:
                     new_owner: RoomMember = random.choice(members)
-                    room_info.owner_id = new_owner.user_id
-                    new_owner.is_access_private_chat = True
-                    new_owner.role = RoomRole.OWNER
+                    await uow.room_repo.change_owner(room_id, new_owner)
+                    uow.add_event(
+                        event_name='ChangeOwnerInRoom',
+                        event_type=EventType.CHANGE_OWNER_IN_ROOM,
+                        payload={'room_id': room_id, 'new_owner': new_owner.user_id},
+                        is_save_stat=False
+                    )
             self.log_info(f'Пользователь {user_id} успешно удален из комнаты {room_id}')
             response = RoomMemberDtoGet(**room_member_orm.to_dict())
+            uow.add_event(
+                event_name='RemoveMemberInRoom',
+                event_type=EventType.REMOVE_MEMBER_IN_ROOM,
+                payload=response.model_dump(),
+                is_save_stat=False
+            )
             return response
 
     async def change_owner(self, room_id: UUID, new_owner: str, actor_id: str) -> RoomDtoGet:
@@ -156,6 +189,12 @@ class RoomService(LogMixin):
             room_info = await uow.room_repo.change_owner(room_id, new_owner)
             self.log_info(f'Пользователь {actor_id} успешно сменил пользователя в комнате {room_id}')
             result = RoomDtoGet(**room_info.to_dict())
+            uow.add_event(
+                event_name='ChangeOwnerInRoom',
+                event_type=EventType.CHANGE_OWNER_IN_ROOM,
+                payload={'room_id': room_id, 'new_owner': new_owner},
+                is_save_stat=False
+            )
             return result
 
     async def delete_room(self, room_id: UUID, actor_id: str) -> RoomDtoGet:
@@ -179,6 +218,11 @@ class RoomService(LogMixin):
                 await uow.chat_repo.delete(chat.id)
             self.log_info(f'Комната была удалена {room_id}')
             response = RoomDtoGet(**room_orm_deleted.to_dict())
+            uow.add_event(
+                event_name='RemoveRoom',
+                event_type=EventType.DELETE_ROOM,
+                payload=response.model_dump(),
+            )
         is_saved = await self._cache.delete_room_info(room_id)
         if not is_saved:
             self.log_warning(f'Комната {room_id} не была удалена из кеша')
