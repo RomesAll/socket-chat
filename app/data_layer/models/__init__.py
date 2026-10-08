@@ -2,7 +2,10 @@ from .messages import Message, MessageAttachment, MessageType
 from .base import Base
 from .rooms import Room, RoomMember, RoomRole
 from .chats import Chat, ChatMember, ChatType
-from .users import User, UserInfo, RoleEnum
+from .users import User, RoleEnum
+from .audit import Audit
+from .events import OutboxEvent
+from .statistics import ChatStatistic, UserStatistic, GeneralMessengerStat
 
 
 __author__ = 'RomesAll'
@@ -19,6 +22,10 @@ __all__ = [
     'ChatMember',
     'ChatType',
     'User',
-    'UserInfo',
+    'Audit',
+    'OutboxEvent',
+    'ChatStatistic',
+    'UserStatistic',
+    'GeneralMessengerStat',
     'RoleEnum'
 ]
