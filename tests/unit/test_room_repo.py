@@ -1,9 +1,11 @@
 from uuid import uuid4
 import pytest
-from app.data_layer.models import Room, User
+from app.data_layer.models import Room, User, RoomMember
+from app.data_layer.repositories.room.read import RoomReadRepository
 from app.data_layer.repositories.room.write import RoomRepository
 from app.data_layer.exceptions import RecordNotFound
 from app.shared.dto import RoomDtoSave
+from app.shared.dto.enums import RoomRole
 
 
 async def test_change_owner_success(db_session):
@@ -28,7 +30,7 @@ async def test_change_owner_success(db_session):
     await db_session.commit()
 
     repo = RoomRepository(session=db_session)
-    updated_room = await repo.change_owner(room_id=room_id, new_owner=new_owner_id)
+    updated_room = await repo.set_owner(room_id=room_id, new_owner=new_owner_id)
 
     assert updated_room.owner_id == new_owner_id
 
@@ -43,7 +45,7 @@ async def test_change_owner_room_not_found(db_session):
     """
     repo = RoomRepository(db_session)
     with pytest.raises(RecordNotFound):
-        await repo.change_owner(uuid4(), 'user_new_id')
+        await repo.set_owner(uuid4(), 'user_new_id')
 
 
 async def test_find_by_id_returns_room_when_exists(db_session):
@@ -72,7 +74,7 @@ async def test_find_by_id_returns_none(db_session):
 
 async def test_get_owner_by_id_room_returns_when_exists(db_session):
     """Тест: Получения ID владельца комнаты."""
-    user_id = uuid4()
+    user_id = 'new_user'
     new_user = User(id=user_id, display_name="New Owner", email="new@test.com", password=b"123")
     db_session.add(new_user)
     await db_session.commit()
@@ -95,3 +97,36 @@ async def test_get_owner_by_id_room_not_found(db_session):
     repo = RoomRepository(db_session)
     with pytest.raises(RecordNotFound):
         await repo.get_owner_room(room_id=uuid4())
+
+
+async def test_get_user_rooms_when_exists(db_session):
+    """Тест: Получение комнат пользователя, роли в комнатах и кол-во участников"""
+    new_user_1 = User(id='new_user_1', display_name="New user 1", email="new1@test.com", password=b"123")
+    new_user_2 = User(id='new_user_2', display_name="New user 2", email="new2@test.com", password=b"123")
+    db_session.add_all([new_user_1, new_user_2])
+    await db_session.flush()
+
+    test_room = Room(id=uuid4(), name="Тестовая комната", owner_id=new_user_1.id)
+    db_session.add(test_room)
+    await db_session.flush()
+
+    room_member_1 = RoomMember(
+        room_id=test_room.id,
+        user_id=new_user_1.id,
+        role=RoomRole.OWNER,
+        is_access_private_chat=True
+    )
+    room_member_2 = RoomMember(
+        room_id=test_room.id,
+        user_id=new_user_2.id,
+        role=RoomRole.MEMBER
+    )
+    db_session.add_all([room_member_1, room_member_2])
+    await db_session.flush()
+
+    room_read_repo = RoomReadRepository(db_session)
+    user_rooms = await room_read_repo.get_user_rooms(user_id=new_user_1.id)
+    assert len(user_rooms) == 1
+    assert user_rooms[0].owner_id == new_user_1.id
+    assert user_rooms[0].members_count == 2
+    assert user_rooms[0].role == RoomRole.OWNER
