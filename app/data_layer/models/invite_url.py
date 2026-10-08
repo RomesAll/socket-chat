@@ -24,9 +24,10 @@ class InviteUrl(MongoBaseModel):
     __tablename__ = "invite_url_tokens"
 
     token: Mapped[str]
+    actor_id: Mapped[str]
     room_id: Mapped[UUID]
     created_at: Mapped[datetime]
     expires_at: Mapped[datetime]
-    max_uses: Mapped[int]
+    max_uses: Mapped[int | None] = mapped_field(default=None)
     uses_count: Mapped[int]
     is_revoked: Mapped[bool] = mapped_field(default=False)
