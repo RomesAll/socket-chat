@@ -1,31 +1,33 @@
-from typing import Sequence
 from uuid import UUID
-from sqlalchemy import select, and_
-from app.business_logic.exceptions import OwnerInRoomEmpty
-from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.repositories.base.base_repo import (
     BaseGetRepository,
     BaseSaveRepository,
     BaseUpdateRepository,
     BaseDeleteRepository
 )
-from app.shared.dto.room import RoomDtoUpdate, RoomDtoSave
-from app.data_layer.models import Room, RoomRole, RoomMember
+from app.shared.dto.room import RoomSaveDTO, RoomUpdateDTO
+from app.data_layer.models import Room
 
 
 class RoomRepository(
     BaseGetRepository[Room],
-    BaseSaveRepository[Room, RoomDtoSave],
-    BaseUpdateRepository[Room, RoomDtoUpdate],
+    BaseSaveRepository[Room, RoomSaveDTO],
+    BaseUpdateRepository[Room, RoomUpdateDTO],
     BaseDeleteRepository[Room]
 ):
-    """Репозиторий для работы с комнатами"""
+    """
+    Репозиторий для записи и точечного чтения комнат (write-side).
+
+    Отвечает за создание, обновление и удаление ORM-модели Room,
+    а также за получение отдельной комнаты по идентификатору
+    для сценариев записи.
+    """
 
     MODEL: type[Room] = Room
 
-    async def change_owner(self, room_id: UUID, new_owner: str) -> Room:
+    async def set_owner(self, room_id: UUID, new_owner: str) -> Room:
         """
-        Сменить владельца для комнаты в базе данных.
+        Поменять поле `owner_id` для комнаты в базе данных.
 
         :param room_id: Идентификатор комнаты.
         :param new_owner: ID нового владельца.
