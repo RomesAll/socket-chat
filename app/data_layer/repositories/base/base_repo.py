@@ -1,14 +1,14 @@
+from dataclasses import is_dataclass, fields
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import TypeVar, Generic, Any, Sequence
 from app.data_layer.exceptions import RecordNotFound
 from app.data_layer.models import Base
 from app.data_layer.repositories.metaclass_repo import RepoMeta
-from app.shared.dto.base import BaseSaveDto, BaseUpdateDto
+from app.shared.dto.base import BaseSaveDTO, BaseUpdateDTO, UNSET
 
-
-TUpdateDto = TypeVar("TUpdateDto", bound=BaseUpdateDto)
-TSaveDto = TypeVar("TSaveDto", bound=BaseSaveDto)
+TUpdateDto = TypeVar("TUpdateDto", bound=BaseUpdateDTO)
+TSaveDto = TypeVar("TSaveDto", bound=BaseSaveDTO)
 TOrmModel = TypeVar('TOrmModel', bound=Base)
 
 
@@ -67,22 +67,25 @@ class BaseGetRepository(BaseRepository[TOrmModel]):
 
 class BaseSaveRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TSaveDto]):
     """
-    Базовый класс репозитория для создания записей в базе данных.
+    Базовый класс репозитория для создания записей.
 
-    Определяет стандартный метод для инициализации ORM-модели
-    на основе переданного объекта DTO и её сохранения в сессии.
+    DTO — dataclass. Поля со значением UNSET пропускаются,
+    чтобы БД применила свои default-значения.
     """
 
     async def save(self, request: TSaveDto) -> TOrmModel:
-        """
-        Сохранить новую запись в базе данных.
+        if not is_dataclass(request):
+            raise TypeError(
+                f"{type(request).__name__} объект должен быть dataclass"
+            )
 
-        :param request: Объект DTO с валидированными данными для создания записи.
-        :return: Созданный и добавленный в сессию объект ORM-модели.
-        """
-        # exclude_unset=True удаляет базовые значения pydantic,
-        # для того, чтобы база данных применила свои базовые значения
-        orm_model = self.MODEL(**request.model_dump(exclude_unset=True))
+        data = {
+            f.name: getattr(request, f.name)
+            for f in fields(request)
+            if getattr(request, f.name) is not UNSET
+        }
+
+        orm_model = self.MODEL(**data)
         self.session.add(orm_model)
         await self.session.flush()
         return orm_model
@@ -90,28 +93,28 @@ class BaseSaveRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TSaveDto]
 
 class BaseUpdateRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TUpdateDto]):
     """
-    Базовый класс репозитория для обновления записей в базе данных.
+    Базовый класс репозитория для обновления записей.
 
-    Определяет стандартный метод для обновления существующей записи на
-    основе переданного объекта DTO с валидированными данными.
+    DTO — dataclass. Поля со значением UNSET не трогают запись,
+    поля со значением None — явно обнуляют колонку.
     """
 
     async def update(self, record_id: Any, request: TUpdateDto) -> TOrmModel:
-        """
-        Обновить существующую запись в базе данных по
-        идентификатору записи (ID).
+        if not is_dataclass(request):
+            raise TypeError(
+                f"{type(request).__name__} must be a dataclass"
+            )
 
-        :param record_id: Идентификатор записи
-        :param request: Объект DTO с валидированными данными для обновления записи.
-        :return: Обновленная ORM-модель в сессии.
-        :raise RecordNotFound: Если запись с указанным ID не найдена в таблице.
-        """
         record_info: TOrmModel | None = await self.session.get(self.MODEL, record_id)
         if record_info is None:
             raise RecordNotFound([record_id], self.MODEL.__tablename__, 'id')
-        raw_data = request.model_dump(exclude_unset=True)
-        for k, v in raw_data.items():
-            setattr(record_info, k, v)
+
+        for f in fields(request):
+            value = getattr(request, f.name)
+            if value is UNSET:
+                continue
+            setattr(record_info, f.name, value)
+
         await self.session.flush()
         return record_info
 

@@ -1,55 +1,56 @@
-from datetime import datetime
+from dataclasses import dataclass
 from uuid import UUID
-from pydantic import BaseModel
-from app.data_layer.models import RoomRole
-from typing import TYPE_CHECKING
-from app.shared.dto.chat import ChatDtoSave
+from app.shared.dto.base import _UnsetType, UNSET, BaseSaveDTO, BaseUpdateDTO
+from app.shared.dto.enums import RoomRole
 
 
-class RoomMemberDtoSave(BaseModel):
-    """DTO для сохранения участника комнаты"""
-    room_id: UUID
-    user_id: str
-    role: RoomRole = RoomRole.MEMBER
-
-
-class RoomDtoSave(BaseModel):
-    """DTO для сохранения комнаты"""
+@dataclass(frozen=True, slots=True)
+class RoomSaveDTO(BaseSaveDTO):
+    """DTO для сохранения комнаты в БД."""
     id: UUID
     name: str
-    description: str = ''
-    avatar_url: str | None = None
-    owner_id: str
-    is_private: bool = True
-    members: list[RoomMemberDtoSave]
-    chats: list[ChatDtoSave]
-
-
-class RoomDtoUpdate(BaseModel):
-    """DTO для обновления комнаты"""
-    name: str | None = None
     description: str | None = None
     avatar_url: str | None = None
     owner_id: str | None = None
-    is_private: bool | None = None
 
 
-class RoomDtoGet(BaseModel):
-    """DTO для получения комнаты"""
+@dataclass(frozen=True, slots=True)
+class RoomUpdateDTO(BaseUpdateDTO):
+    """DTO для обновления комнаты в БД."""
+    name: str | None | _UnsetType = UNSET
+    description: str | None | _UnsetType = UNSET
+    avatar_url: str | None | _UnsetType = UNSET
+    owner_id: str | None | _UnsetType = UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class RoomDTO:
+    """DTO для получения информации о комнате"""
     id: UUID
     name: str
     description: str | None
     avatar_url: str | None
-    owner_id: str
-    is_private: bool
-    created_at: datetime
-    updated_at: datetime
+    owner_id: str | None
 
 
-class RoomMemberDtoGet(BaseModel):
-    """DTO для получения участника комнаты"""
-    room_id: UUID
-    user_id: str
+@dataclass(frozen=True, slots=True)
+class RoomWithUserRoleDTO:
+    """DTO для получения информации о комнате, роли пользователя в ней и счетчик участников"""
+    id: UUID
+    name: str
+    avatar_url: str | None
+    owner_id: str | None
     role: RoomRole
-    created_at: datetime
-    updated_at: datetime
+    members_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class RoomDetailsDTO:
+    """DTO для получения детальной информации о комнате и счетчик участников, админов"""
+    id: UUID
+    name: str
+    description: str | None
+    avatar_url: str | None
+    owner_id: str | None
+    members_count: int
+    admins_count: int
