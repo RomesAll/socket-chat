@@ -1,0 +1,45 @@
+from uuid import uuid4
+import pytest
+from app.data_layer.models import Room, User
+from app.data_layer.repositories.room.write import RoomRepository
+from app.data_layer.exceptions import RecordNotFound
+
+
+async def test_change_owner_success(db_session):
+    """Тест: Успешное изменение ID владельца комнаты в сессии БД."""
+
+    # Создание пользователей в БД, чтобы не ломать ForeignKey
+    old_owner_id = "user_old_id"
+    new_owner_id = "user_new_id"
+
+    # Создание старого и нового владельца
+    old_user = User(id=old_owner_id, display_name="Old Owner", email="old@test.com", password=b"123")
+    new_user = User(id=new_owner_id, display_name="New Owner", email="new@test.com", password=b"123")
+
+    db_session.add_all([old_user, new_user])
+    await db_session.flush()
+
+    # Создание комнаты с реальным owner_id
+    room_id = uuid4()
+    test_room = Room(id=room_id, name="Тестовая комната", owner_id=old_owner_id)
+
+    db_session.add(test_room)
+    await db_session.commit()
+
+    repo = RoomRepository(session=db_session)
+    updated_room = await repo.change_owner(room_id=room_id, new_owner=new_owner_id)
+
+    assert updated_room.owner_id == new_owner_id
+
+    refreshed_room = await db_session.get(Room, room_id)
+    assert refreshed_room.owner_id == new_owner_id
+
+
+async def test_change_owner_room_not_found(db_session):
+    """
+    Тест: Получения исключения RecordNotFound при смене
+    владельца в несуществующей комнате.
+    """
+    repo = RoomRepository(db_session)
+    with pytest.raises(RecordNotFound):
+        await repo.change_owner(uuid4(), 'user_new_id')
