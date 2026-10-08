@@ -3,6 +3,7 @@ import pytest
 from app.data_layer.models import Room, User
 from app.data_layer.repositories.room.write import RoomRepository
 from app.data_layer.exceptions import RecordNotFound
+from app.shared.dto import RoomDtoSave
 
 
 async def test_change_owner_success(db_session):
@@ -43,3 +44,27 @@ async def test_change_owner_room_not_found(db_session):
     repo = RoomRepository(db_session)
     with pytest.raises(RecordNotFound):
         await repo.change_owner(uuid4(), 'user_new_id')
+
+
+async def test_find_by_id_returns_room_when_exists(db_session):
+    """Тест: Успешное получение ORM-модели Room из сессии БД."""
+    new_room = RoomDtoSave(id=uuid4(), name='Тестовая комната')
+    repo = RoomRepository(db_session)
+    created = await repo.save(new_room)
+    await db_session.commit()
+
+    result = await repo.find_by_id(room_id=created.id)
+
+    assert result is not None
+    assert result.id == created.id
+    assert result.name == 'Тестовая комната'
+
+
+async def test_find_by_id_returns_none(db_session):
+    """
+    Тест: Получение None вместо ORM-модели Room,
+    т.к. комнаты не была добавлена ранее в сессию БД.
+    """
+    repo = RoomRepository(db_session)
+    result = await repo.find_by_id(room_id=uuid4())
+    assert result is None

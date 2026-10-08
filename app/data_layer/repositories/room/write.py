@@ -35,3 +35,16 @@ class RoomRepository(
         room_info.owner_id = new_owner
         await self.session.flush()
         return room_info
+
+    async def find_by_id(self, room_id: UUID) -> Room | None:
+        """
+        Получить ORM-модель Room или None.
+
+        В отличие от `get_record_by_id`, не кидает исключение,
+        если комната не найдена — используется в сценариях,
+        где отсутствие записи допустимо.
+
+        :param room_id: Идентификатор комнаты.
+        :return: Объект ORM модели Room или None, если комнаты нет.
+        """
+        return await self.session.get(self.MODEL, room_id)
