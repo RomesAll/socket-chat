@@ -4,8 +4,33 @@ from app.data_layer.models import Room, User, RoomMember
 from app.data_layer.repositories.room.read import RoomReadRepository
 from app.data_layer.repositories.room.write import RoomRepository
 from app.data_layer.exceptions import RecordNotFound
-from app.shared.dto import RoomDtoSave
+from app.shared.dto.room import RoomSaveDTO, RoomUpdateDTO
 from app.shared.dto.enums import RoomRole
+
+
+async def test_save_room_success(db_session):
+    """Тест: Успешное добавление новой комнаты в сессии БД."""
+    save_dto = RoomSaveDTO(id=uuid4(), name='Тестовая комната')
+    room_repo = RoomRepository(db_session)
+    result = await room_repo.save(save_dto)
+    await db_session.commit()
+    assert result.id == save_dto.id
+    assert result.owner_id is None
+    assert result.name == save_dto.name
+
+
+async def test_update_room_success(db_session):
+    """Тест: Успешное обновление комнаты в сессии БД."""
+    save_dto = RoomSaveDTO(id=uuid4(), name='Тестовая комната')
+    room_repo = RoomRepository(db_session)
+    old_room = await room_repo.save(save_dto)
+    await db_session.commit()
+    assert old_room.name == save_dto.name
+
+    update_dto = RoomUpdateDTO(name='Обновленная комната')
+    updated_room = await room_repo.update(save_dto.id, update_dto)
+    await db_session.commit()
+    assert updated_room.name == update_dto.name
 
 
 async def test_change_owner_success(db_session):
@@ -50,7 +75,7 @@ async def test_change_owner_room_not_found(db_session):
 
 async def test_find_by_id_returns_room_when_exists(db_session):
     """Тест: Успешное получение ORM-модели Room из сессии БД."""
-    new_room = RoomDtoSave(id=uuid4(), name='Тестовая комната')
+    new_room = RoomSaveDTO(id=uuid4(), name='Тестовая комната')
     repo = RoomRepository(db_session)
     created = await repo.save(new_room)
     await db_session.commit()
