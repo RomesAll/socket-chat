@@ -1,79 +1,140 @@
+from typing import Sequence
 from uuid import UUID
 from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
 from app.data_layer.exceptions import RecordNotFound
-from app.data_layer.repositories.base import BaseRepository
-from app.shared.dto.room import RoomDtoUpdate, RoomMemberDtoSave, RoomDtoSave
+from app.data_layer.repositories.base_repo import (
+    BaseGetRepository,
+    BaseSaveRepository,
+    BaseUpdateRepository,
+    BaseDeleteRepository
+)
+from app.shared.dto.room import RoomDtoUpdate, RoomDtoSave
 from app.data_layer.models import Room, RoomRole, RoomMember
 
 
-class RoomRepository(BaseRepository[Room]):
-    """Репозиторий для работы с данными комнат"""
+class RoomRepository(
+    BaseGetRepository[Room],
+    BaseSaveRepository[Room, RoomDtoSave],
+    BaseUpdateRepository[Room, RoomDtoUpdate],
+    BaseDeleteRepository[Room]
+):
+    """Репозиторий для работы с комнатами"""
+
     MODEL: type[Room] = Room
     ROOM_MEMBER_MODEL: type[RoomMember] = RoomMember
 
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-        self.MAPPING_DTO_ORM_SAVE.update({
-            RoomDtoSave: Room,
-            RoomMemberDtoSave: RoomMember
-        })
+    async def get_user_rooms(self, user_id: str) -> Sequence[Room]:
+        """
+        Получение информации о комнатах, в которых состоит пользователь
+        :param user_id: идентификатор пользователя
+        :return: Sequence объекты orm модели Room
+        """
+        stmt = (
+            select(self.MODEL)
+            .join(self.ROOM_MEMBER_MODEL, self.ROOM_MEMBER_MODEL.room_id == self.MODEL.id)
+            .where(self.ROOM_MEMBER_MODEL.user_id == user_id)
+        )
+        results = await self.session.scalars(stmt)
+        return results.all()
 
-    async def get_rooms(self, limit: int, offset: int, with_relation: bool = False) -> list[Room]:
-        """Получение списка комнат"""
-        options = None
-        if with_relation:
-            options = self._with_room_options()
-        result = await self._get(limit, offset, options)
+    async def get_room_member(self, room_id: UUID, member_id: str) -> RoomMember:
+        """
+        Получение участника комнаты
+        :param room_id: id комнаты
+        :param member_id: id участника
+        :return:
+        """
+        stmt = (
+            select(self.ROOM_MEMBER_MODEL)
+            .where(self.ROOM_MEMBER_MODEL.room_id == room_id)
+        )
+        result = await self.session.scalar(stmt)
+        if not result:
+            raise RecordNotFound(
+                [member_id, room_id],
+                self.ROOM_MEMBER_MODEL.__tablename__,
+                'user_id, room_id'
+            )
         return result
 
-    async def get_member_in_room(self, room_id: UUID, with_relation: bool = False) -> list[RoomMember]:
-        """Получение участников комнаты"""
-        stmt = select(self.ROOM_MEMBER_MODEL).where(self.ROOM_MEMBER_MODEL.room_id == room_id)
-        if with_relation:
-            stmt = stmt.options(*self._with_room_member_options())
-        sqla_obj = await self.session.execute(stmt)
-        return list(sqla_obj.scalars().all())
+    async def get_room_members(self, room_id: UUID) -> Sequence[RoomMember]:
+        """
+        Получение информации об участниках комнаты
+        :param room_id: идентификатор комнаты
+        :return: Sequence объекты orm модели RoomMember
+        """
+        stmt = (
+            select(self.ROOM_MEMBER_MODEL)
+            .where(self.ROOM_MEMBER_MODEL.room_id == room_id)
+        )
+        results = await self.session.scalars(stmt)
+        return results.all()
 
-    async def get_room_by_id(self, room_id: UUID, with_relation: bool = False) -> Room:
-        """Получение комнаты по id"""
-        options = None
-        if with_relation:
-            options = self._with_room_options()
-        result = await self._get_by_id(room_id, options)
-        return result
-
-    async def add_member_in_room(self, room_member: RoomMemberDtoSave) -> RoomMember:
-        """Добавление участника в комнату"""
-        raw_data = room_member.model_dump()
-        orm_model = self.ROOM_MEMBER_MODEL(**raw_data)
+    async def add_room_member_def_user(self, room_id: UUID, user_id: str) -> RoomMember:
+        """
+        Добавление нового участника в комнату
+        :param user_id: id пользователя
+        :param room_id: id комнаты
+        :return: новый объект orm модели RoomMember
+        """
+        orm_model = self.ROOM_MEMBER_MODEL(
+            room_id=room_id,
+            user_id=user_id
+        )
         self.session.add(orm_model)
         await self.session.flush()
         return orm_model
 
-    async def remove_member_in_room(self, room_id: UUID, user_id: str) -> RoomMember:
-        """Удаление участника из комнаты"""
-        stmt = (
+    async def add_room_member_owner(self, room_id: UUID, user_id: str) -> RoomMember:
+        """
+        Добавление владельца в комнату
+        :param user_id: id пользователя
+        :param room_id: id комнаты
+        :return: новый объект orm модели RoomMember
+        """
+        orm_model = self.ROOM_MEMBER_MODEL(
+            room_id=room_id,
+            user_id=user_id,
+            role=RoomRole.OWNER,
+            is_access_private_chat=True
+        )
+        self.session.add(orm_model)
+        await self.session.flush()
+        return orm_model
+
+    async def remove_room_member(self, room_id: UUID, user_id: str) -> RoomMember:
+        """
+        Удалить участника из комнаты
+        :param room_id: id комнаты
+        :param user_id: id пользователя
+        :return: удаленный объекты orm модели ChatMember
+        """
+        stmt_exist = (
             select(self.ROOM_MEMBER_MODEL)
             .where(
-                self.ROOM_MEMBER_MODEL.room_id == room_id,
-                self.ROOM_MEMBER_MODEL.user_id == user_id
+                self.ROOM_MEMBER_MODEL.user_id == user_id,
+                self.ROOM_MEMBER_MODEL.room_id == room_id
             )
         )
-        sqla_obj = await self.session.execute(stmt)
-        room_member = sqla_obj.scalar_one_or_none()
+        room_member = await self.session.scalar(stmt_exist)
         if not room_member:
-            raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL.__tablename__, 'id')
+            raise RecordNotFound(
+                [user_id, room_id],
+                self.ROOM_MEMBER_MODEL.__tablename__,
+                'user_id, room_id'
+            )
+        await self.session.delete(room_member)
+        await self.session.flush()
         return room_member
 
-    async def update_room(self, room_id: UUID, update_room: RoomDtoUpdate) -> Room:
-        """Обновление информации о комнате"""
-        result = await self.update(room_id, update_room)
-        return result
-
     async def update_role_member_in_room(self, room_id: UUID, user_id: str, new_role: RoomRole) -> RoomMember:
-        """Обновить роль участника комнаты"""
+        """
+        Обновить роль участника комнаты
+        :param room_id: идентификатор комнаты
+        :param user_id: идентификатор пользователя
+        :param new_role: новая роль
+        :return: обновленный объекты orm модели RoomMember
+        """
         stmt = (
             select(self.ROOM_MEMBER_MODEL)
             .where(
@@ -87,19 +148,46 @@ class RoomRepository(BaseRepository[Room]):
         if not member:
             raise RecordNotFound(f'room={room_id}, user={user_id}', self.MODEL.__tablename__, 'id')
         member.role = new_role
+        await self.session.flush()
         return member
 
-    def _with_room_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            joinedload(self.MODEL.owner),
-            selectinload(self.MODEL.members),
-            selectinload(self.MODEL.chats)
-        ]
+    async def change_owner(self, room_id: UUID, new_owner: str) -> Room:
+        """
+        Сменить владельца комнаты
+        :param room_id: id комнаты
+        :param new_owner: новый владелец комнаты
+        :return:
+        """
+        room_info = await self.get_record_by_id(room_id)
+        member = await self.get_room_member(room_id, new_owner)
+        room_info.owner_id = member.user_id
+        member.is_access_private_chat = True
+        member.role = RoomRole.OWNER
+        await self.session.flush()
+        return room_info
 
-    def _with_room_member_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            joinedload(self.ROOM_MEMBER_MODEL.room),
-            joinedload(self.ROOM_MEMBER_MODEL.user),
-        ]
+    async def get_room_owner(self, room_id: UUID) -> str | None:
+        """
+        Получение владельца комнаты
+        :param room_id: id комнаты
+        :return:
+        """
+        stmt = (
+            select(self.MODEL.owner_id)
+            .where(self.MODEL.id == room_id)
+        )
+        result = await self.session.scalar(stmt)
+        return result
+
+    async def get_user_owner_rooms(self, user_id: str) -> Sequence[Room]:
+        """
+        Получить комнаты, в которых пользователь является владельцем
+        :param user_id: id пользователя
+        :return:
+        """
+        stmt = (
+            select(self.MODEL)
+            .where(self.MODEL.owner_id == user_id)
+        )
+        results = await self.session.scalars(stmt)
+        return results.all()
