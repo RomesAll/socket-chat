@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy import select, func
 from app.data_layer.repositories.base.base_repo import BaseRepository
 from app.data_layer.models import Room, RoomMember
-from app.shared.dto.room import RoomDTO, RoomListItemDTO
+from app.shared.dto.room import RoomDTO, RoomWithUserRoleDTO
 
 
 class RoomReadRepository(BaseRepository):
@@ -30,7 +30,7 @@ class RoomReadRepository(BaseRepository):
         row = (await self.session.execute(stmt)).one_or_none()
         return RoomDTO(**row._mapping) if row else None
 
-    async def get_user_rooms(self, user_id: str) -> list[RoomListItemDTO]:
+    async def get_user_rooms(self, user_id: str) -> list[RoomWithUserRoleDTO]:
         """Получить комнаты пользователя, его роль и кол-во участников."""
         stmt = (
             select(
@@ -58,7 +58,7 @@ class RoomReadRepository(BaseRepository):
             counts = {room_id: cnt for room_id, cnt in count_rows}
 
         return [
-            RoomListItemDTO(
+            RoomWithUserRoleDTO(
                 id=row.id,
                 name=row.name,
                 avatar_url=row.avatar_url,
