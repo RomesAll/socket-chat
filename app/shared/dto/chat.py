@@ -1,47 +1,56 @@
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel
+from app.shared.dto.base import BaseSaveDTO, BaseUpdateDTO, UNSET, _UnsetType
+from app.shared.dto.enums import ChatRole, ChatType
 
 
-class ChatDtoSave(BaseModel):
-    """DTO для сохранения чата"""
+@dataclass(frozen=True, slots=True)
+class ChatSaveDTO(BaseSaveDTO):
+    """DTO для создания чата."""
+    type: ChatType
+    is_active: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class ChatUpdateDTO(BaseUpdateDTO):
+    """DTO для обновления чата."""
+    is_active: bool | None | _UnsetType = UNSET
+    last_message_at: datetime | None | _UnsetType = UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class ChatDTO:
+    """DTO для получения базовой информации о чате"""
     id: UUID
-    name: str
-    room_id: UUID
-    members: list[ChatMemberDtoSave]
+    type: ChatType
+    is_active: bool
+    last_message_at: datetime | None
 
 
-class ChatMemberDtoSave(BaseModel):
-    """DTO для сохранения участника чата"""
+@dataclass(frozen=True, slots=True)
+class ChatMemberSaveDTO(BaseSaveDTO):
+    """DTO для добавления участника в чат."""
     chat_id: UUID
     user_id: str
+    role: ChatRole = ChatRole.MEMBER
+    mute: bool = False
 
 
-class ChatDtoUpdate(BaseModel):
-    """DTO для обновления чата"""
-    name: str | None = None
+@dataclass(frozen=True, slots=True)
+class ChatMemberUpdateDTO(BaseUpdateDTO):
+    """DTO для обновления участника чата."""
+    role: ChatRole | None | _UnsetType = UNSET
+    mute: bool | None | _UnsetType = UNSET
+    last_read_message_id: UUID | None | _UnsetType = UNSET
 
 
-class ChatMemberDtoUpdate(BaseModel):
-    """DTO для обновления участника чата"""
-    last_read_message_id: UUID | None = None
-    mute: bool | None = None
-
-
-class ChatDtoGet(BaseModel):
-    """DTO для получения информации о чате"""
-    id: UUID
-    name: str
-    room_id: UUID
-    created_at: datetime
-    updated_at: datetime
-
-
-class ChatMemberDtoGet(BaseModel):
-    """DTO для получения информации об участниках чате"""
+@dataclass(frozen=True, slots=True)
+class ChatMemberDTO:
+    """DTO для получения информации об участниках чата"""
     chat_id: UUID
     user_id: str
-    last_read_message_id: UUID
+    role: ChatRole
     mute: bool
-    created_at: datetime
-    updated_at: datetime
+    last_read_message_id: UUID | None
+    last_message_id: UUID | None
