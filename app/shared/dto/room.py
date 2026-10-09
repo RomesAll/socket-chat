@@ -55,3 +55,12 @@ class RoomDetailsDTO:
     owner_id: str | None
     members_count: int
     admins_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class GenerateInviteToken:
+    """DTO для создания url токена для вступления в группу."""
+    actor_id: str
+    room_id: UUID
+    hours: int
+    max_uses: int | None = None
