@@ -1,82 +1,88 @@
+from datetime import datetime, timezone
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
 from app.data_layer.exceptions import RecordNotFound
-from app.data_layer.repositories.base import BaseRepository
-from app.shared.dto import UserDtoSave, UserDtoInfoSave
-from app.shared.dto.user import UserDtoUpdateDefaultInfo, UserDtoUpdateExtendedInfo
-from app.data_layer.models import User, UserInfo
+from app.data_layer.repositories.base.base_repo import (
+    BaseGetRepository,
+    BaseSaveRepository,
+    BaseUpdateRepository,
+    BaseDeleteRepository
+)
+from app.shared.dto.user import UserEncryptedSaveDTO, UserUpdateDTO
+from app.data_layer.models import User
 
 
-class UserRepository(BaseRepository[User]):
+class UserRepository(
+    BaseGetRepository[User],
+    BaseSaveRepository[User, UserEncryptedSaveDTO],
+    BaseUpdateRepository[User, UserUpdateDTO],
+    BaseDeleteRepository[User]
+):
     """Репозиторий для работы с данными пользователя"""
-    MODEL = User
-    USER_INFO_MODEL = UserInfo
 
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-        self.MAPPING_DTO_ORM_SAVE.update({
-            UserDtoSave: User,
-            UserDtoInfoSave: UserInfo
-        })
+    MODEL: type[User] = User
 
-    async def get_users(self, limit: int, offset: int, with_relation: bool = False) -> list[User]:
-        """Получение списка пользователей"""
-        options = None
-        if with_relation:
-            options = self._with_user_options()
-        result = await self._get(limit, offset, options)
-        return result
-
-    async def get_user_by_id(self, user_id: str, with_relation: bool = False) -> User:
-        """Получение пользователя по id"""
-        options = None
-        if with_relation:
-            options = self._with_user_options()
-        result = await self._get_by_id(user_id, options)
-        return result
-
-    async def get_user_by_email(self, email: str, with_relation: bool = False) -> UserInfo:
-        """Получение пользователя по email"""
+    async def get_user_by_email(self, email: str) -> User:
+        """
+        Получить пользователя по email.
+        :param email: Почта.
+        :return: Объект orm модели User.
+        """
         stmt = (
-            select(self.USER_INFO_MODEL)
-            .where(self.USER_INFO_MODEL.email == email)
+            select(self.MODEL)
+            .where(self.MODEL.email == email)
         )
-        if with_relation:
-            stmt = stmt.options(*self._with_user_info_options())
-        sqla_obj = await self.session.execute(stmt)
-        user_info = sqla_obj.scalar_one_or_none()
+        user_info = await self.session.scalar(stmt)
         if not user_info:
-            raise RecordNotFound(email, self.MODEL.__tablename__, 'email')
+            raise RecordNotFound([email], self.MODEL.__tablename__, 'email')
         return user_info
 
-    async def update_default_info(self, user_id, update_user: UserDtoUpdateDefaultInfo) -> User:
-        """Обновления пользователя"""
-        result = await self.update(user_id, update_user)
-        return result
+    async def change_email(self, user_id: str, new_email: str) -> User:
+        """
+        Сменить адрес электронной почты.
 
-    async def update_extended_info(self, user_id, update_user: UserDtoUpdateExtendedInfo) -> UserInfo:
-        """Обновление расширенной информации о пользователе"""
-        user = await self.get_user_by_id(user_id, True)
-        raw_data = update_user.model_dump(
-            exclude_none=True,
-            exclude_unset=True,
-            exclude_defaults=True
-        )
-        for k, v in raw_data.items():
-            setattr(user.user_info, k, v)
-        return user.user_info
+        :param user_id: Id пользователя.
+        :param new_email: Новая почта.
+        :return: Объект orm модели User.
+        """
+        user_info = await self.get_record_by_id(user_id)
+        user_info.email = new_email
+        await self.session.flush()
+        return user_info
 
-    def _with_user_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            joinedload(self.MODEL.user_info),
-            selectinload(self.MODEL.room_members),
-            selectinload(self.MODEL.owned_rooms)
-        ]
+    async def change_password(self, user_id: str, hash_psw: bytes) -> User:
+        """
+        Сменить адрес электронной почты.
 
-    def _with_user_info_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            joinedload(self.USER_INFO_MODEL.user)
-        ]
+        :param user_id: Id пользователя.
+        :param hash_psw: Хеш пароля.
+        :return: Объект orm модели User.
+        """
+        user_info = await self.get_record_by_id(user_id)
+        user_info.password = hash_psw
+        await self.session.flush()
+        return user_info
+
+    async def soft_delete(self, user_id: str) -> User:
+        """
+        Мягкое удаление пользователя с возможностью восстановления.
+
+        :param user_id: Id пользователя.
+        :return: Объект orm модели User.
+        """
+        user_info = await self.get_record_by_id(user_id)
+        user_info.is_deleted = True
+        user_info.deleted_at = datetime.now(tz=timezone.utc)
+        await self.session.flush()
+        return user_info
+
+    async def recovery_delete(self, user_id: str) -> User:
+        """
+        Восстановление удаленного пользователя
+        :param user_id: id пользователя
+        :return: объект orm модели User
+        """
+        user_info = await self.get_record_by_id(user_id)
+        user_info.is_deleted = False
+        user_info.deleted_at = None
+        await self.session.flush()
+        return user_info
