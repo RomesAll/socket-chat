@@ -1,6 +1,6 @@
 from .messages import Message, MessageAttachment, MessageType
 from .base import Base
-from .rooms import Room, RoomMember, RoomRole
+from .rooms import Room
 from .chats import Chat, ChatMember
 from .users import User
 from .audit import Audit
@@ -16,8 +16,6 @@ __all__ = [
     'MessageAttachment',
     'MessageType',
     'Room',
-    'RoomMember',
-    'RoomRole',
     'Chat',
     'ChatMember',
     'User',
