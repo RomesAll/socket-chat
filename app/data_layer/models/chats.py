@@ -1,16 +1,17 @@
-from sqlalchemy import ForeignKey, String, CheckConstraint
+from datetime import datetime
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped
 from uuid import UUID
 from .base import Base, UuidIsMixin
+from app.shared.dto.enums import ChatRole, ChatType
 
 
 class Chat(UuidIsMixin, Base):
     """Orm модель для хранения информации о чатах"""
-    type: Mapped[str] = mapped_column(String(20))
+    type: Mapped[ChatType]
     is_active: Mapped[bool] = mapped_column(default=True)
-
-    __table_args__ = (
-        CheckConstraint("type IN ('private', 'room')", name='check_type'),
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        default=None, nullable=True,
     )
 
 
@@ -24,8 +25,14 @@ class ChatMember(Base):
         ForeignKey('user.id', ondelete='CASCADE'),
         primary_key=True
     )
-    last_read_message_id: Mapped[UUID] = mapped_column(
+    role: Mapped[ChatRole] = mapped_column(default=ChatRole.MEMBER)
+    last_read_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey('message.id', ondelete='SET NULL'),
         default=None,
-        nullable=True
+        nullable=True,
     )
-    mute: Mapped[bool] = mapped_column(default=False)
+    last_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey('message.id', ondelete='SET NULL'),
+        default=None, nullable=True,
+    )
+    mute: Mapped[bool] = mapped_column(default=False, nullable=False)
