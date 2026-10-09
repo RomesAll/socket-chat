@@ -25,6 +25,8 @@ class RoomReadRepository:
                 Room.title,
                 Room.description,
                 Room.avatar_url,
+                Room.created_at,
+                Room.updated_at
             )
             .where(Room.chat_id == room_id)
         )
@@ -49,7 +51,9 @@ class RoomReadRepository:
                 Room.avatar_url,
                 ChatMember.user_id,
                 ChatMember.role,
-                members_count
+                members_count,
+                Room.created_at,
+                Room.updated_at
             )
             .join(ChatMember, ChatMember.chat_id == Room.chat_id)
             .where(ChatMember.user_id == user_id)
@@ -57,15 +61,7 @@ class RoomReadRepository:
         )
         rows = (await self.session.execute(stmt)).all()
         return [
-            RoomUserMemberDTO(
-                chat_id=row.chat_id,
-                title=row.title,
-                avatar_url=row.avatar_url,
-                description=row.description,
-                member_id=row.user_id,
-                role=row.role,
-                members_count=row.members_count,
-            )
+            RoomUserMemberDTO(**row._mapping)
             for row in rows
         ]
 

@@ -1,3 +1,4 @@
+from datetime import datetime
 from dataclasses import dataclass
 from uuid import UUID
 from app.shared.dto.base import _UnsetType, UNSET, BaseSaveDTO, BaseUpdateDTO
@@ -30,6 +31,8 @@ class RoomDTO:
     title: str
     description: str | None
     avatar_url: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +45,8 @@ class RoomUserMemberDTO:
     member_id: str
     role: ChatRole
     members_count: int
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +60,8 @@ class RoomDetailsDTO:
     owner_id: str | None
     members_count: int
     admins_count: int
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True)

@@ -19,6 +19,8 @@ class ChatReadRepository:
                 Chat.type,
                 Chat.is_active,
                 Chat.last_message_at,
+                Chat.created_at,
+                Chat.updated_at
             )
             .where(Chat.id == chat_id)
         )
@@ -33,6 +35,8 @@ class ChatReadRepository:
                 Chat.type,
                 Chat.is_active,
                 Chat.last_message_at,
+                Chat.created_at,
+                Chat.updated_at
             )
             .join(ChatMember, ChatMember.chat_id == Chat.id)
             .where(ChatMember.user_id == user_id)

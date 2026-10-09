@@ -22,6 +22,8 @@ class ChatMemberReadRepository:
                 ChatMember.mute,
                 ChatMember.last_read_message_id,
                 ChatMember.last_message_id,
+                ChatMember.created_at,
+                ChatMember.updated_at
             )
             .where(
                 ChatMember.chat_id == chat_id,
@@ -41,6 +43,8 @@ class ChatMemberReadRepository:
                 ChatMember.mute,
                 ChatMember.last_read_message_id,
                 ChatMember.last_message_id,
+                ChatMember.created_at,
+                ChatMember.updated_at
             )
             .where(ChatMember.chat_id == chat_id)
             .order_by(ChatMember.role, ChatMember.user_id)

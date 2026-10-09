@@ -1,75 +1,57 @@
+from app.shared.dto.base import BaseSaveDTO, _UnsetType, UNSET, BaseUpdateDTO
+from app.shared.dto.enums import RoleEnum
+from dataclasses import dataclass
 from datetime import datetime
-from pydantic import BaseModel, model_validator
-from app.data_layer.models import RoleEnum
 
 
-class UserDtoSave(BaseModel):
-    """DTO для хранения и валидации информации о новом пользователе"""
-    id: str
-    display_name: str
-    avatar_url: str | None = None
-    user_info: UserDtoInfoSave
-
-
-class UserDtoInfoSave(BaseModel):
-    """DTO для хранения и валидации расширенной информации о новом пользователе"""
-    id: str
-    description: str | None = None
-    years_old: int | None = None
-    email: str
-    password: bytes
-    repeat_password: bytes
-
-    @model_validator(mode='after')
-    def validate_psw(self):
-        if self.repeat_password != self.password:
-            raise ValueError('Пароли не совпадают')
-        return self
-
-
-class UserRegister(BaseModel):
-    """DTO для регистрации пользователя"""
+@dataclass(frozen=True, slots=True)
+class BaseUserSaveDTO:
+    """Базовый DTO для сохранения пользователя."""
     id: str
     display_name: str
     email: str
+    avatar_url: str | None
+    description: str | None
+    years_old: int | None
+    role: RoleEnum
+
+
+@dataclass(frozen=True, slots=True)
+class UserSaveDTO(BaseUserSaveDTO, BaseSaveDTO):
+    """DTO для хранения данных нового пользователя с открытым паролем."""
     password: str
-    repeat_password: str
 
 
-class UserDtoUpdateDefaultInfo(BaseModel):
-    """DTO для хранения и валидации информации об обновлении сущ. пользователя"""
-    display_name: str | None = None
-    avatar_url: str | None = None
+@dataclass(frozen=True, slots=True)
+class UserEncryptedSaveDTO(BaseUserSaveDTO, BaseSaveDTO):
+    """DTO для хранения данных нового пользователя с хешем пароля."""
+    password: bytes
 
 
-class UserDtoUpdateExtendedInfo(BaseModel):
-    """DTO для обновления расширенной информации о пользователе"""
-    description: str | None = None
-    years_old: int | None = None
-    role: RoleEnum | None = None
+@dataclass(frozen=True, slots=True)
+class UserUpdateDTO(BaseUpdateDTO):
+    """DTO для обновления базовой информации пользователя."""
+    display_name: str | None | _UnsetType= UNSET
+    avatar_url: str | None | _UnsetType= UNSET
+    description: str | None | _UnsetType= UNSET
+    years_old: int | None | _UnsetType= UNSET
 
 
-class UserDtoBriefGet(BaseModel):
-    """DTO для получения общей информации о пользователе"""
+@dataclass(frozen=True, slots=True)
+class UserDtoBriefGet:
+    """DTO для получения общей информации о пользователе."""
     id: str
     display_name: str
-    avatar_url: str | None = None
+    avatar_url: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
 class UserDtoGet(UserDtoBriefGet):
-    """DTO для получения информации о пользователе"""
-    user_info: UserDtoGetWithExtInfo
-
-
-class UserDtoGetWithExtInfo(BaseModel):
-    """DTO для получения расширенной информации о пользователе"""
-    description: str | None = None
-    years_old: int | None = None
+    """DTO для получения информации о пользователе."""
+    description: str | None
+    years_old: int | None
     role: RoleEnum
     email: str
-    last_seen_at: datetime | None = None
-
-
-class RegisterDtoGet(UserDtoGet):
-    """DTO для получения ответа после регистрации"""
-    code: int | None = None
+    last_seen_at: datetime | None
