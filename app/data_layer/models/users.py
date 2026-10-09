@@ -1,15 +1,8 @@
 from datetime import datetime
-from enum import Enum
-from sqlalchemy import LargeBinary, ForeignKey, DateTime
+from sqlalchemy import LargeBinary, DateTime
 from sqlalchemy.orm import mapped_column, Mapped
 from .base import Base, StrIdMixin
-
-
-class RoleEnum(str, Enum):
-    """Перечисление списка ролей"""
-    DEFAULT_USER = 'default_user'
-    ADMIN = 'admin'
-    SUPER_ADMIN = 'super_admin'
+from app.shared.dto.enums import RoleEnum
 
 
 class User(StrIdMixin, Base):
