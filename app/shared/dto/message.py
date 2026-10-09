@@ -1,64 +1,37 @@
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
-from pydantic import BaseModel
-from app.data_layer.models import MessageType
-from app.data_layer.models.messages import MimeType
+from dataclasses import dataclass
+from app.shared.dto.base import BaseSaveDTO
+from app.shared.dto.enums import MessageType
 
 
-class MessageDtoSave(BaseModel):
-    """DTO для сохранения сообщений"""
+@dataclass(frozen=True, slots=True)
+class BaseMessageDTO:
+    """DTO для хранения информации о сообщении."""
     id: UUID
     chat_id: UUID
     sender_id: str
-    body: str = ''
     type: MessageType
-    reply_to_message_id: UUID | None = None
-    forwarded_from_message_id: UUID | None = None
-    forwarded_from_user_id: str | None = None
-    is_edited: bool = False
-    message_file: list[MessageAttachmentDtoSave] | None = None
+    reply_to_message_id: UUID | None
+    forwarded_from_message_id: UUID | None
+    forwarded_from_user_id: str | None
 
 
-class MessageDtoCreate(BaseModel):
-    """DTO для сохранения сообщений"""
-    id: UUID
-    chat_id: UUID
-    sender_id: str
-    body_encrypted: str = ''
-    type: MessageType
-    reply_to_message_id: UUID | None = None
-    forwarded_from_message_id: UUID | None = None
-    forwarded_from_user_id: str | None = None
-    is_edited: bool = False
-    message_file: list[MessageAttachmentDtoSave] | None = None
+@dataclass(frozen=True, slots=True)
+class MessageSaveDTO(BaseMessageDTO):
+    """DTO для хранения информации о сообщении с открытым текстом сообщения."""
+    text: str | None
 
 
-class MessageDtoGetWithBodyEncrypted(MessageDtoCreate):
-    """DTO для получения сохраненного сообщения"""
-    created_at: datetime
-    updated_at: datetime
-    is_deleted: bool = False
-    deleted_at: datetime | None = None
+@dataclass(frozen=True, slots=True)
+class MessageEncryptedSavedDTO(BaseSaveDTO):
+    """DTO для хранения информации о сообщении с зашифрованным сообщением."""
+    body_encrypted: str | None
 
 
-class MessageDtoGetWithBodyDecrypted(MessageDtoSave):
-    """DTO для сохранения сообщений в кеше"""
-    created_at: datetime
-    updated_at: datetime
-    is_deleted: bool = False
-    deleted_at: datetime | None = None
-
-
-class MessageDtoUpdate(BaseModel):
-    """DTO для обновления сообщений"""
-    body_encrypted: str | None = None
-    is_edited: bool | None = None
-    is_deleted: bool | None = None
-
-
-class MessageAttachmentDtoSave(BaseModel):
-    """DTO для сохранения файлов"""
-    id: UUID
+@dataclass(frozen=True, slots=True)
+class MessageAttachmentSaveDTO(BaseSaveDTO):
+    """DTO для сохранения информации о медиафайлах сообщения."""
     message_id: UUID
     file_name: str
     file_path: str
@@ -66,17 +39,61 @@ class MessageAttachmentDtoSave(BaseModel):
     size: int
 
 
-class MessageAttachmentDtoGet(MessageAttachmentDtoSave):
-    """DTO для хранения метаданных файлов"""
-    created_at: datetime
-    updated_at: datetime
-
-
-class MessageAttachmentsDtoPostRequest(BaseModel):
-    """User DTO для операции добавления (Post) информации о файлах"""
+@dataclass(frozen=True, slots=True)
+class MessageAttachmentGetDTO:
+    """DTO для получения информации о медиафайлах сообщения."""
     id: UUID
     message_id: UUID
     file_name: str
     file_path: str
-    file_size: int
-    mime_type: MimeType
+    mime_type: str
+    size: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class MessageGetDTO(BaseMessageDTO):
+    """Получить информацию о сообщения с открытым текстом сообщения."""
+    text: str | None
+    is_edited: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class MessageEncryptedReadDTO(BaseMessageDTO):
+    """Получить информацию о сообщения с зашифрованным текстом сообщения."""
+    body_encrypted: str | None
+    is_edited: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class BaseMessageSenderGroupChat:
+    """
+    DTO для хранения базовой информации о
+    сообщения сгруппированных по чатам
+    """
+    sender_id: str
+    date_limit: date
+    count_chats: int
+
+
+@dataclass(frozen=True, slots=True)
+class MessageEncryptedSenderGroupChat(BaseMessageSenderGroupChat):
+    """
+    Получить информацию о сообщениях с зашифрованным
+    текстом сообщения сгруппированных по чатам
+    """
+    chats: dict[UUID, list[MessageEncryptedReadDTO]]
+
+
+@dataclass(frozen=True, slots=True)
+class MessageSenderGroupChat(BaseMessageSenderGroupChat):
+    """
+    Получить информацию о сообщения с открытым
+    текстом сообщения сгруппированных по чатам
+    """
+    chats: dict[UUID, list[MessageGetDTO]]

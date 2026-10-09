@@ -1,49 +1,58 @@
 from datetime import datetime, date, timedelta
 from uuid import UUID
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
-from app.data_layer.exceptions import RecordNotFound
-from app.data_layer.repositories.base import BaseRepository
-from app.data_layer.models import Message, MessageAttachment
-from app.shared.dto.message import MessageDtoCreate, MessageAttachmentDtoSave
+from sqlalchemy import select
+from app.data_layer.repositories.base.base_repo import (
+    BaseGetRepository,
+    BaseSaveRepository,
+    BaseDeleteRepository
+)
+from app.data_layer.models import Message
+from app.shared.dto.message import (
+    MessageEncryptedSavedDTO,
+    MessageEncryptedReadDTO,
+    MessageEncryptedSenderGroupChat
+)
 
 
-class MessageRepository(BaseRepository[Message]):
+class MessageRepository(
+    BaseGetRepository[Message],
+    BaseSaveRepository[Message, MessageEncryptedSavedDTO],
+    BaseDeleteRepository[Message]
+):
     """Репозиторий для работы с сообщениями"""
+
     MODEL: type[Message] = Message
-    MESSAGE_ATTACHMENT_MODEL: type[MessageAttachment] = MessageAttachment
 
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-        self.MAPPING_DTO_ORM_SAVE.update({
-            MessageDtoCreate: Message,
-            MessageAttachmentDtoSave: MessageAttachment
-        })
+    async def get_message_by_chat(self, date_limit: date, chat_id: UUID) -> list[MessageEncryptedReadDTO]:
+        """
+        Получить сообщения в чате.
 
-    async def get_message_by_chat(self, date_limit: date, chat_id: UUID, with_relation: bool = False) -> list[Message]:
-        """Получение сообщений по чату"""
+        :param date_limit: Дата выборки сообщений.
+        :param chat_id: Id чата.
+        :return: Список ORM-моделей Message
+        """
         start = datetime.combine(date_limit, datetime.min.time())
         end = start + timedelta(days=1)
         stmt = (
             select(self.MODEL)
-            .where(and_(
+            .where(
                 self.MODEL.chat_id == chat_id,
                 self.MODEL.created_at >= start,
                 self.MODEL.created_at < end
-            ))
+            )
             .order_by(self.MODEL.created_at)
         )
-        if with_relation:
-            stmt = stmt.options(*self._with_msg_options())
-        sqla_obj = await self.session.execute(stmt)
-        messages = sqla_obj.scalars().all()
-        return list(messages)
+        results = await self.session.scalars(stmt)
+        return [MessageEncryptedReadDTO(**msg.to_dict()) for msg in results.all()]
 
-    async def get_message_by_sender(
-            self, date_limit: date, sender_id: str, with_relation: bool = False
-    ) -> dict[UUID, list[Message]]:
-        """Получение сообщений отправителя"""
+    async def get_message_by_sender(self, date_limit: date, sender_id: str) -> MessageEncryptedSenderGroupChat:
+        """
+        Получить сообщения отправителя, сгруппированных по чатам.
+
+        :param date_limit: Дата сообщений.
+        :param sender_id: Id отправителя.
+        :return: Ключ - id чата, значение - список сообщений.
+        """
         start = datetime.combine(date_limit, datetime.min.time())
         end = start + timedelta(days=1)
         stmt = (
@@ -55,37 +64,32 @@ class MessageRepository(BaseRepository[Message]):
             )
             .order_by(self.MODEL.created_at)
         )
-        if with_relation:
-            stmt = stmt.options(*self._with_msg_options())
-        sqla_obj = await self.session.execute(stmt)
-        messages = sqla_obj.scalars().all()
-        grouped: dict[UUID, list[Message]] = {}
+        results = await self.session.scalars(stmt)
+        messages = results.all()
+        grouped: dict[UUID, list[MessageEncryptedReadDTO]] = {}
         for msg in messages:
-            grouped.setdefault(msg.chat_id, []).append(msg)
-        return grouped
-
-    async def get_file_by_id(self, file_id: UUID, with_relation: bool = False) -> MessageAttachment:
-        """Получение файлов по id"""
-        stmt = (
-            select(self.MESSAGE_ATTACHMENT_MODEL)
-            .where(self.MESSAGE_ATTACHMENT_MODEL.id == file_id)
+            grouped.setdefault(msg.chat_id, []).append(
+                MessageEncryptedReadDTO(**msg.to_dict())
+            )
+        result = MessageEncryptedSenderGroupChat(
+            sender_id=sender_id,
+            date_limit=date_limit,
+            count_chats=len(grouped.keys()),
+            chats=grouped
         )
-        if with_relation:
-            stmt = stmt.options(*self._with_msg_attachment_options())
-        sqla_obj = await self.session.execute(stmt)
-        msg_file = sqla_obj.scalar_one_or_none()
-        if not msg_file:
-            raise RecordNotFound(file_id, self.MODEL.__tablename__, 'id')
-        return msg_file
+        return result
 
-    def _with_msg_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            selectinload(self.MODEL.message_file),
-        ]
+    async def set_is_edited(self, message_id: UUID) -> Message:
+        """Сделать сообщение измененным"""
+        msg = await self.get_record_by_id(message_id)
+        if not msg.is_edited:
+            msg.is_edited = True
+            await self.session.flush()
+        return msg
 
-    def _with_msg_attachment_options(self):
-        """Получение relation для жадной загрузки"""
-        return [
-            joinedload(self.MESSAGE_ATTACHMENT_MODEL.message_info),
-        ]
+    async def update_message(self, message_id: UUID, new_encr_msg: str) -> Message:
+        """Обновить сообщение отправителя."""
+        msg = await self.get_record_by_id(message_id)
+        msg.body_encrypted = new_encr_msg
+        await self.session.flush()
+        return msg
