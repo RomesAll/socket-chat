@@ -1,25 +1,17 @@
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, String, CheckConstraint
 from sqlalchemy.orm import mapped_column, Mapped
-from enum import Enum
 from uuid import UUID
 from .base import Base, UuidIsMixin
 
 
-class ChatType(str, Enum):
-    """Перечисление типов чатов"""
-    PRIVATE = 'private'
-    GROUP = 'group'
-
-
 class Chat(UuidIsMixin, Base):
     """Orm модель для хранения информации о чатах"""
-    name: Mapped[str]
-    room_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey('room.id', ondelete='CASCADE'),
-        nullable=True,
-        default=None
+    type: Mapped[str] = mapped_column(String(20))
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+    __table_args__ = (
+        CheckConstraint("type IN ('private', 'room')", name='check_type'),
     )
-    is_private: Mapped[bool] = mapped_column(default=False)
 
 
 class ChatMember(Base):

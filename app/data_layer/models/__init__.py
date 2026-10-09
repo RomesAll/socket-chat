@@ -1,8 +1,8 @@
 from .messages import Message, MessageAttachment, MessageType
 from .base import Base
 from .rooms import Room, RoomMember, RoomRole
-from .chats import Chat, ChatMember, ChatType
-from .users import User, RoleEnum
+from .chats import Chat, ChatMember
+from .users import User
 from .audit import Audit
 from .events import OutboxEvent
 from .statistics import ChatStatistic, UserStatistic, GeneralMessengerStat
@@ -20,12 +20,10 @@ __all__ = [
     'RoomRole',
     'Chat',
     'ChatMember',
-    'ChatType',
     'User',
     'Audit',
     'OutboxEvent',
     'ChatStatistic',
     'UserStatistic',
-    'GeneralMessengerStat',
-    'RoleEnum'
+    'GeneralMessengerStat'
 ]

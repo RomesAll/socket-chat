@@ -19,13 +19,13 @@ class RoomReadRepository(BaseRepository):
         """Получить комнату по ID или None."""
         stmt = (
             select(
-                Room.id,
+                Room.chat_id,
                 Room.name,
                 Room.description,
                 Room.avatar_url,
                 Room.owner_id,
             )
-            .where(Room.id == room_id)
+            .where(Room.chat_id == room_id)
         )
         row = (await self.session.execute(stmt)).one_or_none()
         return RoomDTO(**row._mapping) if row else None
@@ -34,18 +34,18 @@ class RoomReadRepository(BaseRepository):
         """Получить комнаты пользователя, его роль и кол-во участников."""
         stmt = (
             select(
-                Room.id,
+                Room.chat_id,
                 Room.name,
                 Room.avatar_url,
                 Room.owner_id,
                 RoomMember.role,
             )
-            .join(RoomMember, RoomMember.room_id == Room.id)
+            .join(RoomMember, RoomMember.room_id == Room.chat_id)
             .where(RoomMember.user_id == user_id)
             .order_by(Room.name)
         )
         rows = (await self.session.execute(stmt)).all()
-        room_ids = [row.id for row in rows]
+        room_ids = [row.chat_id for row in rows]
 
         counts: dict[UUID, int] = {}
         if room_ids:
@@ -59,12 +59,12 @@ class RoomReadRepository(BaseRepository):
 
         return [
             RoomWithUserRoleDTO(
-                id=row.id,
+                chat_id=row.chat_id,
                 name=row.name,
                 avatar_url=row.avatar_url,
                 owner_id=row.owner_id,
                 role=row.role,
-                members_count=counts.get(row.id, 0),
+                members_count=counts.get(row.chat_id, 0),
             )
             for row in rows
         ]
