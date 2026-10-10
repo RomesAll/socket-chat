@@ -1,9 +1,12 @@
-import asyncio
-from app.data_layer.models.events import OutboxEvent, Status, EventType
-from app.data_layer.repositories import MessageRepository, ChatRepository, RoomRepository, UserRepository
+from app.data_layer.models.events import OutboxEvent, EventType
+from app.data_layer.repositories import MessageRepository, UserRepository
 from mongotic.asyncio import AsyncSession as MongoSession
 from sqlalchemy.ext.asyncio import AsyncSession as SqlAsyncSession
+from app.data_layer.repositories.chat import ChatRepository, ChatReadRepository
 from app.data_layer.repositories.invite_url_repo import InviteUrlRepo
+from app.data_layer.repositories.message_attachment_repo import MessageAttachmentRepository
+from app.data_layer.repositories.room import RoomRepository, RoomReadRepository
+import asyncio
 
 
 class UnitOfWork:
@@ -11,10 +14,18 @@ class UnitOfWork:
     def __init__(self, sql_session: SqlAsyncSession, mongo_session: MongoSession | None = None):
         self.sql_session = sql_session
         self.mongo_session = mongo_session
+
         self.msg_repo = MessageRepository(self.sql_session)
+        self.msg_attach_repo = MessageAttachmentRepository(self.sql_session)
+
+        self.chat_read_repo = ChatReadRepository(self.sql_session)
         self.chat_repo = ChatRepository(self.sql_session)
+
+        self.room_read_repo = RoomReadRepository(self.sql_session)
         self.room_repo = RoomRepository(self.sql_session)
+
         self.user_repo = UserRepository(self.sql_session)
+
         if self.mongo_session:
             self.invite_url_repo = InviteUrlRepo(self.mongo_session)
         self._events = []
