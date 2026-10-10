@@ -1,7 +1,7 @@
 from uuid import uuid4, UUID
 import pytest
-from app.data_layer.models import Chat, Room, User, ChatMember
-from app.shared.dto.enums import ChatType, ChatRole, RoleEnum
+from app.data_layer.models import Chat, Room, User, ChatMember, Message
+from app.shared.dto.enums import ChatType, ChatRole, RoleEnum, MessageType
 
 
 @pytest.fixture(scope='function')
@@ -64,7 +64,7 @@ async def default_room_setup(
     db_session.add(room)
 
     await db_session.flush()
-    return {"chat": chat, "owner": owner, "room": room}
+    return {"chat": chat, "owner": member, "room": room}
 
 
 @pytest.fixture(scope='function')
@@ -76,16 +76,16 @@ async def private_chat_setup(
     """Фикстура для создания приватного чата с двумя пользователями."""
     chat = await chat_factory(chat_type=ChatType.PRIVATE, chat_id=uuid4())
     user_1 = await user_factory(
-        user_id="room_owner",
-        display_name="Owner",
+        user_id="user_1",
+        display_name="user_1",
         email="new@test.com",
         password=b"123",
         role=RoleEnum.DEFAULT_USER
     )
     user_2 = await user_factory(
-        user_id="room_owner",
-        display_name="Owner",
-        email="new@test.com",
+        user_id="user_2",
+        display_name="user_2",
+        email="new2@test.com",
         password=b"123",
         role=RoleEnum.DEFAULT_USER
     )
@@ -95,3 +95,24 @@ async def private_chat_setup(
 
     await db_session.flush()
     return {"chat": chat, "members": [member_1, member_2]}
+
+
+@pytest.fixture(scope='function')
+async def message_setup(
+        db_session,
+        private_chat_setup,
+):
+    """Фикстура для создания сообщения."""
+    message = Message(
+        id=uuid4(),
+        chat_id=private_chat_setup['chat'].id,
+        sender_id=private_chat_setup['members'][0].user_id,
+        body_encrypted='hello',
+        type=MessageType.TEXT
+    )
+    db_session.add(message)
+    await db_session.flush()
+
+    msg_setup = {}
+    msg_setup.update(message=message, **private_chat_setup)
+    return msg_setup
