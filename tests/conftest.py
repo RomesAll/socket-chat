@@ -1,15 +1,21 @@
 import pytest
 from typing import AsyncGenerator
+
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.data_layer.models import Base
 from app.shared.config import create_config, AppMode
+from mongotic.asyncio import AsyncSession as MongoticAsyncSession
+from mongotic.asyncio import create_async_engine as mongo_create_async_engine
 
 # Инициализация тестового конфига из файла .test.env
 config = create_config(mode=AppMode.TEST)
 TEST_DATABASE_URL = config.postgres.url
+TEST_DATABASE_MONGO_URL = config.mongodb.url
 
 # Создание асинхронного движка и фабрики сессии sqlalchemy
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+test_mongo_engine = mongo_create_async_engine(host=TEST_DATABASE_MONGO_URL, uuidRepresentation="standard")
 TestingSessionLocal = async_sessionmaker(bind=test_engine, expire_on_commit=False)
 
 
@@ -43,3 +49,17 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         # откат всех изменений
         await session.close()
         await transaction.rollback()
+
+
+@pytest.fixture(scope='function')
+async def db_mongo_session() -> AsyncGenerator[AsyncSession, None]:
+  """Фикстура для получения асинхронной сессии mongotic."""
+  async with MongoticAsyncSession(bind=test_mongo_engine) as session:
+    yield session
+    session.rollback()
+
+
+@pytest.fixture(scope='function')
+async def redis_client():
+    client = Redis.from_url(config.redis.url)
+    return client
