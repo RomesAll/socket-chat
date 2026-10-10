@@ -1,8 +1,6 @@
-import pytest
 from app.business_logic.redis_adapter import VerifyCodeStorage
 
 
-@pytest.mark.asyncio
 async def test_save_verify_code(redis_client):
     """Тест для сохранения и получения кода подтверждения"""
     user_id = 'Roman'

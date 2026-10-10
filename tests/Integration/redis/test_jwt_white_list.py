@@ -1,10 +1,7 @@
-import asyncio
 from uuid import uuid4
-import pytest
 from app.business_logic.redis_adapter import JWTWhiteListCache
 
 
-@pytest.mark.asyncio
 async def test_save_refresh_token(redis_client):
     """Тест для сохранения и получения id refresh токена в redis"""
     user_id = 'Roman'
