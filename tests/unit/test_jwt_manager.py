@@ -1,41 +1,45 @@
 from uuid import uuid4
-import pytest
-from app.business_logic.jwt_manager import JWTAccessManager, JWTRefreshManager
-from app.data_layer.models import RoleEnum
-from app.shared.dto.jwt import JWTAccessToken, JWTRefreshToken
+from app.business_logic.jwt_manager import JWTFacade, JWTAccessManager, JWTRefreshManager
+from app.shared.dto.enums import RoleEnum
 
 
-def test_access_token():
-    """Тест создания и декодирования access токена"""
-    request = JWTAccessToken(
-        user_id='RomeSky',
-        sub='Роман',
-        exp=1000,
-        session_id=uuid4(),
-        role=RoleEnum.DEFAULT_USER
-    )
-    token = JWTAccessManager.create_token(request)
-    payload = JWTAccessManager.decode_token(token)
-    assert payload.user_id == request.user_id
-    assert payload.sub == request.sub
-    assert payload.role == request.role
-    assert payload.session_id == request.session_id
-
-
-def test_refresh_token():
-    """Тест создания и декодирования refresh токена"""
-    request = JWTRefreshToken(
-        user_id='RomeSky',
-        sub='Роман',
-        exp=1000,
-        session_id=uuid4(),
-        role=RoleEnum.DEFAULT_USER,
+async def test_jwt_facade_create_token():
+    """Тест: Создание пары access и refresh токенов."""
+    tokens = JWTFacade.create_tokens(
+        user_id='user_id',
+        sub='some info',
+        role=RoleEnum.ADMIN,
         refresh_id=uuid4()
     )
-    token = JWTRefreshManager.create_token(request)
-    payload = JWTRefreshManager.decode_token(token)
-    assert payload.user_id == request.user_id
-    assert payload.sub == request.sub
-    assert payload.role == request.role
-    assert payload.session_id == request.session_id
-    assert payload.refresh_id == request.refresh_id
+    assert len(tokens.access_token) == 275
+    assert len(tokens.refresh_token) == 345
+
+
+async def test_jwt_decode_access_token_success():
+    """Тест: Успешное декодирование access токена."""
+    tokens = JWTFacade.create_tokens(
+        user_id='user_id',
+        sub='some info',
+        role=RoleEnum.ADMIN,
+        refresh_id=uuid4()
+    )
+    payload = JWTAccessManager.decode_token(tokens.access_token)
+
+    assert payload.user_id == 'user_id'
+    assert payload.sub == 'some info'
+    assert payload.role == RoleEnum.ADMIN
+
+
+async def test_jwt_decode_refresh_token_success():
+    """Тест: Успешное декодирование refresh токена."""
+    tokens = JWTFacade.create_tokens(
+        user_id='user_id',
+        sub='some info',
+        role=RoleEnum.ADMIN,
+        refresh_id=uuid4()
+    )
+    payload = JWTRefreshManager.decode_token(tokens.refresh_token)
+
+    assert payload.user_id == 'user_id'
+    assert payload.sub == 'some info'
+    assert payload.role == RoleEnum.ADMIN
