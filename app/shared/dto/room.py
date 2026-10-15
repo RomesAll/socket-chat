@@ -36,13 +36,23 @@ class RoomDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class TopRoomsByMemberDTO:
+    """DTO для получения информации о топ комнат по кол-ву участников."""
+    chat_id: UUID
+    owner_id: str
+    count_member: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class RoomUserMemberDTO:
     """DTO для получения информации о комнате, в которых состоит выбранный пользователь"""
     chat_id: UUID
     title: str
     description: str | None
     avatar_url: str | None
-    member_id: str
+    user_id: str
     role: ChatRole
     members_count: int
     created_at: datetime
