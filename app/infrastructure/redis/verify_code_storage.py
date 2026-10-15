@@ -1,6 +1,6 @@
 from redis.asyncio import Redis
 from app.business_logic.exceptions import SaveCodeError
-from app.business_logic.redis_adapter.exception_handler import exception_handler
+from app.infrastructure.redis.exception_handler import exception_handler
 
 
 class VerifyCodeStorage:

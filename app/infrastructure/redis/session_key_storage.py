@@ -1,11 +1,11 @@
 from uuid import UUID
 from redis.asyncio import Redis
 from app.business_logic.exceptions import SessionKeyNotFound, SaveSessionKeyError
-from app.business_logic.redis_adapter.exception_handler import exception_handler
+from app.infrastructure.redis.exception_handler import exception_handler
 
 
 class SessionKeyStorage:
-    """Адаптер для хранения сессионных ключей в redis кеше"""
+    """Адаптер для хранения сессионных ключей в redis кеше."""
     def __init__(self, client: Redis):
         self.client = client
         self._prefix = 'session'
