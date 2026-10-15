@@ -1,130 +1,154 @@
 from datetime import date
 from uuid import UUID
-from app.business_logic.encrypte_manager import SymmetricEncode
-from app.business_logic.redis_adapter import Cache
-from app.business_logic.websocket.broker import WSBroker
-from app.data_layer.models.events import EventType
+from app.business_logic.mappers.message_mapper import MessageMapper
 from app.business_logic.unit_of_work import UnitOfWork
-from app.shared.dto import MessageDtoSave
+from app.domain.events import MessageSent, MessageEdited, MessageDeleted
+from app.infrastructure.redis import ChatMessageCache
 from app.shared.dto.message import (
-    MessageDtoGetWithBodyEncrypted,
-    MessageAttachmentDtoGet,
-    MessageDtoCreate,
-    MessageDtoGetWithBodyDecrypted
+    MessageEncryptedReadDTO,
+    MessageEncryptedSenderGroupChat,
+    MessageAttachmentSaveDTO,
+    MessageAttachmentGetDTO, MessageEncryptedSavedDTO,
 )
 from app.shared.log_config import LogMixin
-from app.shared.config import get_config, AppMode, BaseConfig
-
-
-def _get_config() -> BaseConfig:
-    return get_config()
 
 
 class MessageService(LogMixin):
-    """Сервис для управления сообщениями"""
-    def __init__(
-            self,
-            uow: UnitOfWork,
-            cache: Cache,
-            broker: WSBroker,
-            cipher: SymmetricEncode
-    ):
+    """Сервис для управления сообщениями и вложениями."""
+
+    def __init__(self, uow: UnitOfWork, mapper: MessageMapper, cache: ChatMessageCache):
         self._uow = uow
+        self._mapper = mapper
         self._cache = cache
-        self._broker = broker
-        self._cipher = cipher
 
-    async def send_and_save_message(self, msg_dto: MessageDtoSave) -> MessageDtoGetWithBodyDecrypted:
-        """Сохранения сообщения"""
-        encrypted = str(self._cipher.encrypt(msg_dto.body))
-        create_dto = MessageDtoCreate(
-            **msg_dto.model_dump(),
-            body_encrypted=encrypted
+    async def get(self, message_id: UUID) -> MessageEncryptedReadDTO:
+        """
+        Получить сообщение по ID.
+
+        :exception RecordNotFound если сообщение не найдено.
+        """
+        message_orm = await self._uow.msg_repo.get_record_by_id(message_id)
+        return self._mapper.to_read_dto(message_orm)
+
+    async def find(self, message_id: UUID) -> MessageEncryptedReadDTO | None:
+        """
+        Найти сообщение по ID.
+
+        :return: DTO или None, если сообщение не найдено.
+        """
+        message_orm = await self._uow.msg_repo.find_by_id(message_id)
+        if message_orm is None:
+            return None
+        return self._mapper.to_read_dto(message_orm)
+
+    async def get_by_chat(self, chat_id: UUID, date_limit: date) -> list[MessageEncryptedReadDTO]:
+        """
+        Получить историю сообщения чата за указанную дату.
+
+        Алгоритм:\n
+        - Делегировать выборку в репозиторий.
+        - Вернуть список DTO с зашифрованным телом.
+        """
+        cached = await self._cache.get_history(chat_id, date_limit)
+        if cached:
+            return cached
+        return await self._uow.msg_repo.get_message_by_chat(date_limit, chat_id)
+
+    async def get_by_sender(self, sender_id: str, date_limit: date) -> MessageEncryptedSenderGroupChat:
+        """
+        Получить сообщения отправителя за определенное время, сгруппированные по чатам.
+        """
+        return await self._uow.msg_repo.get_message_by_sender(date_limit, sender_id)
+
+    async def save(self, message_dto: MessageEncryptedSavedDTO) -> MessageEncryptedReadDTO:
+        """
+        Сохранить новое сообщение.
+
+        Алгоритм:\n
+        - Маппинг из DTO с открытым текстом -> DTO с зашифрованным.
+        - Сохранение сообщения в сессию БД.
+        - Маппинг в DTO из ORM с расшифровкой.
+
+        :param message_dto: DTO с открытым текстом.
+        :return: DTO с расшифрованным текстом.
+        """
+        message_orm = await self._uow.msg_repo.save(message_dto)
+        saved_message = self._mapper.to_read_dto(message_orm)
+        self._uow.add_event(MessageSent(
+            message=saved_message
+        ))
+        self.log_info(
+            f"Создано сообщение {saved_message.id} в чате {saved_message.chat_id}"
         )
-        async with self._uow as uow:
-            msg_orm = await uow.msg_repo.save(create_dto)
-            self.log_info(f'Сообщение пользователя {msg_dto.sender_id} было успешно сохранено в чат {msg_dto.chat_id}')
-            msg_dto_body_enc = MessageDtoGetWithBodyEncrypted(**msg_orm.to_dict())
-            if _get_config().mode not in (AppMode.DEV,):
-                uow.add_event(
-                    event_name='Save new message',
-                    payload=msg_dto_body_enc.model_dump(),
-                    event_type=EventType.SEND_MESSAGE_IN_CHAT
-                )
-                self.log_info(f'Событие {EventType.SEND_MESSAGE_IN_CHAT} зарегистрировано')
-        is_saved = await self._cache.save_chat_msg_info(msg_dto_body_enc)
-        if not is_saved:
-            self.log_warning(f'Сообщение в чате {msg_dto.chat_id} было успешно сохранено')
-        message_result = MessageDtoGetWithBodyDecrypted(
-            **msg_dto_body_enc.model_dump(),
-            body=self._cipher.decrypt(msg_dto_body_enc.body_encrypted.encode())
+        return saved_message
+
+    async def update_body(self, message_id: UUID, new_encr_msg: bytes) -> MessageEncryptedReadDTO:
+        """
+        Обновить тело сообщения.
+
+        Алгоритм:\n
+        - Зашифровать новый текст через маппер.
+        - Обновить тело в БД.
+        - Пометить сообщение как изменённое.
+        - Маппинг ORM в DTO с расшифровкой.
+
+        :param message_id: ID сообщения.
+        :param new_encr_msg: Новый открытый текст.
+        :return: DTO с расшифрованным текстом.
+        """
+        message_orm = await self._uow.msg_repo.update_message(
+            message_id, new_encr_msg,
         )
-        await self._broker.publish_to_chat(
-            action_type='CREATE_MESSAGE',
-            chat_id=msg_dto.chat_id,
-            data=message_result.model_dump(mode='json')
+        message_orm = await self._uow.msg_repo.set_is_edited(message_orm.id)
+        updated_message = self._mapper.to_read_dto(message_orm)
+        self._uow.add_event(MessageEdited(
+            message_id=message_id,
+            chat_id=message_orm.chat_id,
+            new_body_encrypted=new_encr_msg
+        ))
+        self.log_info(f"Обновлено сообщение {updated_message.id}")
+        return updated_message
+
+    async def delete(self, message_id: UUID) -> MessageEncryptedReadDTO:
+        """
+        Удалить сообщение.
+        """
+        message_orm = await self._uow.msg_repo.delete(message_id)
+        deleted_message = self._mapper.to_read_dto(message_orm)
+        self._uow.add_event(MessageDeleted(
+            message_id=message_id,
+            chat_id=message_orm.chat_id,
+        ))
+        self.log_info(f"Удалено сообщение {deleted_message.id}")
+        return deleted_message
+
+    async def get_attachment(self, attachment_id: UUID) -> MessageAttachmentGetDTO:
+        """
+        Получить вложение по ID.
+        :exception RecordNotFound.
+        """
+        attachment_orm = await self._uow.msg_attach_repo.get_record_by_id(attachment_id)
+        return self._mapper.attachment_to_dto(attachment_orm)
+
+    async def get_attachments(self, message_id: UUID) -> list[MessageAttachmentGetDTO]:
+        """Получить вложения сообщения."""
+        return await self._uow.msg_attach_repo.get_files_message(message_id)
+
+    async def add_attachment(self, attachment_dto: MessageAttachmentSaveDTO) -> MessageAttachmentGetDTO:
+        """
+        Добавить вложение к сообщению.
+        """
+        attachment_orm = await self._uow.msg_attach_repo.save(attachment_dto)
+        saved_attachment = self._mapper.attachment_to_dto(attachment_orm)
+        self.log_info(
+            f"Добавлено вложение {saved_attachment.id} "
+            f"к сообщению {saved_attachment.message_id}"
         )
-        return message_result
+        return saved_attachment
 
-    async def get_message_by_chat(self, msg_date: date, chat_id: UUID) -> list[MessageDtoGetWithBodyDecrypted]:
-        """Получение сообщения в чате"""
-        cached_data = await self._cache.get_chat_msg_info(chat_id, msg_date)
-        messages_dto: list[MessageDtoGetWithBodyDecrypted] = []
-        if cached_data:
-            return [
-                MessageDtoGetWithBodyDecrypted(
-                    **msg, body=self._cipher.decrypt(msg['body_encrypted'])
-                )
-                for msg in cached_data
-            ]
-        async with self._uow as uow:
-            messages_orm = await uow.msg_repo.get_message_by_chat(msg_date, chat_id)
-        for msg in messages_orm:
-            msg_dto = MessageDtoGetWithBodyDecrypted(
-                **msg.to_dict(),
-                body=self._cipher.decrypt(msg['body_encrypted'])
-            )
-            messages_dto.append(msg_dto)
-            msg_dto_body_enc = MessageDtoGetWithBodyEncrypted(**msg.to_dict())
-            is_saved = await self._cache.save_chat_msg_info(msg_dto_body_enc)
-            if not is_saved:
-                self.log_warning(f'Сообщение в чате {msg_dto.chat_id} было успешно сохранено в кеше')
-        return messages_dto
-
-    async def get_message_by_sender(self, msg_date: date, sender_id: str) -> dict[UUID, list[MessageDtoGetWithBodyDecrypted]]:
-        """Получение всех сообщений отправителя"""
-        async with self._uow as uow:
-            msgs_orm = await uow.msg_repo.get_message_by_sender(msg_date, sender_id)
-            response = {
-                chat_id: [
-                    MessageDtoGetWithBodyDecrypted(
-                        **msg.to_dict(),
-                        body=self._cipher.decrypt(msg['body_encrypted'])
-                    )
-                    for msg in msgs
-                ]
-                for chat_id, msgs in msgs_orm.items()
-            }
-            return response
-
-    async def get_file_by_id(self, file_id: UUID) -> MessageAttachmentDtoGet:
-        """Получение файлов для сообщения"""
-        async with self._uow as uow:
-            msg_orm = await uow.msg_repo.get_file_by_id(file_id)
-            response = MessageAttachmentDtoGet(**msg_orm.to_dict())
-            return response
-
-    async def delete_message(self, message_id: UUID) -> MessageDtoGetWithBodyDecrypted:
-        """Удаление сообщения"""
-        async with self._uow as uow:
-            message = await uow.msg_repo.delete(message_id)
-            response = MessageDtoGetWithBodyDecrypted(
-                **message.to_dict(),
-                body=self._cipher.decrypt(message.body_encrypted)
-            )
-        await self._broker.publish_to_chat(
-            action_type='DELETE_MESSAGE',
-            chat_id=response.chat_id,
-            data=response.model_dump(mode='json')
-        )
-        return response
+    async def delete_attachment(self, attachment_id: UUID) -> MessageAttachmentGetDTO:
+        """Удалить вложение."""
+        attachment_orm = await self._uow.msg_attach_repo.delete(attachment_id)
+        deleted_attachment = self._mapper.attachment_to_dto(attachment_orm)
+        self.log_info(f"Удалено вложение {deleted_attachment.id}")
+        return deleted_attachment
