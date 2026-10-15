@@ -32,7 +32,9 @@ class RoomService(LogMixin):
         if cached:
             return cached
         room_orm = await self._uow.room_repo.get_record_by_id(room_id)
-        return self._mapper.to_dto(room_orm)
+        room_dto = self._mapper.to_dto(room_orm)
+        self._uow.add_after_commit(lambda : self._cache.save_default(room_dto))
+        return room_dto
 
     async def get_top_rooms_by_member(self, top_count: int = 5) -> list[TopRoomsByMemberDTO]:
         """Поучить список комнат по наибольшему кол-ву участников"""
@@ -43,7 +45,10 @@ class RoomService(LogMixin):
         cached = await self._cache.get_default(room_id)
         if cached:
             return cached
-        return await self._uow.room_read_repo.get_by_id(room_id)
+        result = await self._uow.room_read_repo.get_by_id(room_id)
+        if result:
+            self._uow.add_after_commit(lambda: self._cache.save_default(result))
+        return result
 
     async def get_many(self, limit: int, offset: int) -> list[RoomDTO]:
         """Получить комнаты с пагинацией."""
