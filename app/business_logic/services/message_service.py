@@ -52,7 +52,10 @@ class MessageService(LogMixin):
         cached = await self._cache.get_history(chat_id, date_limit)
         if cached:
             return cached
-        return await self._uow.msg_repo.get_message_by_chat(date_limit, chat_id)
+
+        msg_dto = await self._uow.msg_repo.get_message_by_chat(date_limit, chat_id)
+        self._uow.add_after_commit(lambda : self._cache.push(msg_dto))
+        return msg_dto
 
     async def get_by_sender(self, sender_id: str, date_limit: date) -> MessageEncryptedSenderGroupChat:
         """
