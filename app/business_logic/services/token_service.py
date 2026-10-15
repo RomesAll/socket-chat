@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4, UUID
 from app.business_logic.exceptions import RefreshTokenInActive
 from app.infrastructure.security.jwt_manager import JWTFacade
-from app.business_logic.redis_adapter import JWTWhiteListCache
+from app.infrastructure.redis import JWTWhiteListCache
 from app.shared.dto.enums import RoleEnum
 from app.shared.dto.jwt import JWTTokenResponse, JWTRefreshTokenResponse
 from app.shared.log_config import LogMixin
