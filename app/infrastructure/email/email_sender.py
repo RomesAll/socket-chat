@@ -2,7 +2,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pydantic import SecretStr
-from app.data_layer.exceptions import EmailSendError
+from app.infrastructure.database.exceptions import EmailSendError
 
 
 class EmailSender:
