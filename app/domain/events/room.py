@@ -7,7 +7,6 @@ from app.shared.dto.room import RoomDTO
 class RoomCreated:
     """Комната создана."""
     room: RoomDTO
-    owner_id: str
 
 
 @dataclass(frozen=True)
@@ -21,4 +20,3 @@ class RoomUpdated:
 class RoomDeleted:
     """Комната удалена."""
     room_id: UUID
-    owner_id: str
