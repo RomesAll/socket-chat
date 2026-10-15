@@ -1,19 +1,19 @@
-from app.data_layer.models.events import OutboxEvent, EventType
-from app.data_layer.repositories import MessageRepository, UserRepository
-from mongotic.asyncio import AsyncSession as MongoSession
+from typing import Callable
+from app.infrastructure.database.repositories import MessageRepository, UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession as SqlAsyncSession
-from app.data_layer.repositories.chat import ChatRepository, ChatReadRepository
-from app.data_layer.repositories.invite_url_repo import InviteUrlRepo
-from app.data_layer.repositories.message_attachment_repo import MessageAttachmentRepository
-from app.data_layer.repositories.room import RoomRepository, RoomReadRepository
-import asyncio
+from app.infrastructure.database.repositories import ChatRepository, ChatReadRepository
+from app.infrastructure.database.repositories import ChatMemberReadRepository, ChatMemberRepository
+from app.infrastructure.database.repositories.message_attachment_repo import MessageAttachmentRepository
+from app.infrastructure.database.repositories import RoomRepository, RoomReadRepository
+from app.infrastructure.events.event_registry import EventRegistry, DataclassInstance
+from app.shared.log_config import LogMixin
 
 
-class UnitOfWork:
-    """Паттерн unit of work (асинхронный)"""
-    def __init__(self, sql_session: SqlAsyncSession, mongo_session: MongoSession | None = None):
+class UnitOfWork(LogMixin):
+    """Паттерн unit of work (асинхронный)."""
+
+    def __init__(self, sql_session: SqlAsyncSession, event_registry: EventRegistry):
         self.sql_session = sql_session
-        self.mongo_session = mongo_session
 
         self.msg_repo = MessageRepository(self.sql_session)
         self.msg_attach_repo = MessageAttachmentRepository(self.sql_session)
@@ -21,14 +21,17 @@ class UnitOfWork:
         self.chat_read_repo = ChatReadRepository(self.sql_session)
         self.chat_repo = ChatRepository(self.sql_session)
 
+        self.chat_member_read_repo = ChatMemberReadRepository(self.sql_session)
+        self.chat_member_repo = ChatMemberRepository(self.sql_session)
+
         self.room_read_repo = RoomReadRepository(self.sql_session)
         self.room_repo = RoomRepository(self.sql_session)
 
         self.user_repo = UserRepository(self.sql_session)
 
-        if self.mongo_session:
-            self.invite_url_repo = InviteUrlRepo(self.mongo_session)
-        self._events = []
+        self._event_registry = event_registry
+        self._events: list[DataclassInstance] = []
+        self._after_commit: list[Callable] = []
 
     async def __aenter__(self):
         return self
@@ -36,51 +39,35 @@ class UnitOfWork:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         try:
             if exc_type:
-                await self.rollback()
+                await self.sql_session.rollback()
             else:
-                await self.commit()
+                await self.sql_session.commit()
+
+                for fn in self._after_commit:
+                    try:
+                        await fn()
+                    except Exception:
+                        self.log_error(f"after_commit failed: {fn}")
+
+                for event in self._events:
+                    try:
+                        await self._event_registry.pub(event)
+                    except Exception:
+                        self.log_error(
+                            f"Не удалось опубликовать событие "
+                            f"{type(event).__name__}: {exc_val}"
+                        )
         finally:
             await self.sql_session.close()
-            if self.mongo_session:
-                await self.mongo_session.close()
+            self._events.clear()
 
-    def add_event(
-            self,
-            event_name: str,
-            payload: dict,
-            event_type: EventType,
-            is_save_stat: bool = True,
-            is_save_audit: bool = True
-    ):
-        self._events.append({
-            'event_name': event_name,
-            'payload': payload,
-            'event_type': event_type,
-            'is_save_stat': is_save_stat,
-            'is_save_audit': is_save_audit
-        })
+    def add_event(self, event: DataclassInstance) -> None:
+        """Зарегистрировать доменное событие для публикации после коммита."""
+        self._events.append(event)
 
-    async def commit(self):
-        """Строгий атомарный коммит в обе базы данных"""
-        if not self.mongo_session and self._events:
-            raise RuntimeError("Попытка сохранить события, но mongo_session не инициализирована в UoW!")
-        if self._events and self.mongo_session:
-            for event in self._events:
-                event_orm = OutboxEvent(
-                    event_name=event["event_name"],
-                    payload=event["payload"],
-                    type=event['event_type'],
-                    is_save_stat=event['is_save_stat'],
-                    is_save_audit=event['is_save_audit']
-                )
-                self.mongo_session.add(event_orm)
-        await self.sql_session.commit()
-        if self.mongo_session:
-            await self.mongo_session.commit()
-        self._events.clear()
-
-    async def rollback(self):
-        """Откат обеих баз данных в случае ошибки бизнес-логики"""
-        await self.sql_session.rollback()
-        if self.mongo_session:
-            await asyncio.to_thread(self.mongo_session.rollback)
+    def add_after_commit(self, fn: Callable):
+        """
+        Добавить в коллекцию вызываемый объект,
+        который будет вып. после commit
+        """
+        self._after_commit.append(fn)
