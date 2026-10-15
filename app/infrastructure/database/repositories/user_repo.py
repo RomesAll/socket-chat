@@ -1,14 +1,14 @@
 from datetime import datetime, timezone
 from sqlalchemy import select
-from app.data_layer.exceptions import RecordNotFound
-from app.data_layer.repositories.base.base_repo import (
+from app.infrastructure.database.exceptions import RecordNotFound
+from app.infrastructure.database.repositories.base.base_repo import (
     BaseGetRepository,
     BaseSaveRepository,
     BaseUpdateRepository,
     BaseDeleteRepository
 )
 from app.shared.dto.user import UserEncryptedSaveDTO, UserUpdateDTO
-from app.data_layer.models import User
+from app.infrastructure.database.models import User
 
 
 class UserRepository(

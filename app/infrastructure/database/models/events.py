@@ -46,6 +46,7 @@ class OutboxEvent(MongoBaseModel):
     __databasename__ = "messenger_db"
     __tablename__ = "outbox_events"
 
+    actor_id: Mapped[str] = mapped_field(description='Пользователь выполнивший действие')
     is_save_stat: Mapped[bool] = mapped_field(default=True, description='Сохранить ли событие в статистику')
     is_save_audit: Mapped[bool] = mapped_field(default=True, description='Сохранить ли событие в аудит')
     event_name: Mapped[str] = mapped_field(description="Название события, например: MessageSentEvent")

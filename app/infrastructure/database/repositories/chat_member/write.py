@@ -1,7 +1,7 @@
 from uuid import UUID
-from app.data_layer.exceptions import RecordNotFound
-from app.data_layer.models import ChatMember
-from app.data_layer.repositories.base import BaseSaveRepository
+from app.infrastructure.database.exceptions import RecordNotFound
+from app.infrastructure.database.models import ChatMember
+from app.infrastructure.database.repositories.base import BaseSaveRepository
 from app.shared.dto.chat import ChatMemberSaveDTO
 from app.shared.dto.enums import ChatRole
 

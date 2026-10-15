@@ -1,9 +1,14 @@
 import functools
 import inspect
+from logging import getLogger
 from typing import Callable
 from sqlalchemy.exc import IntegrityError, DatabaseError, DBAPIError, InterfaceError, TimeoutError
-from app.data_layer.exceptions import IntegrityDBError, DBError, DBConnectionError, DBInterfaceError, \
-    DBTimeoutError, RecordNotFound
+from app.infrastructure.database.exceptions import IntegrityDBError, DBError, DBConnectionError, DBInterfaceError, \
+    DBTimeoutError
+from app.shared.config import get_config
+
+
+app_logger = getLogger(get_config().log_info.log_name)
 
 
 class SqlExceptionHandler:
@@ -28,28 +33,33 @@ class SqlExceptionHandler:
         """Метод обертка для методов репозитория с обработкой ошибок"""
         @functools.wraps(method)
         async def wrapper(*args, **kwargs):
+            exc = None
             try:
                 result = await method(*args, **kwargs)
                 return result
-            except RecordNotFound:
-                raise
             except IntegrityError as e:
                 """Исключения связанные с нарушение целостности данных"""
-                raise IntegrityDBError(e.orig)
+                exc = IntegrityDBError(e.orig)
             except InterfaceError as e:
                 """Исключения связанные с неверным логином, паролем"""
-                raise DBInterfaceError(e.orig)
+                exc = DBInterfaceError(e.orig)
             except DatabaseError as e:
                 """Исключения связанные с ошибками бд"""
-                raise DBError(e.orig)
+                exc = DBError(e.orig)
             except DBAPIError as e:
                 """Исключения связанные с api бд"""
-                raise DBConnectionError(e)
+                exc = DBConnectionError(str(e))
             except TimeoutError as e:
                 """Исключения связанные с таймаутом"""
-                raise DBTimeoutError(e)
+                exc = DBTimeoutError()
             except Exception as e:
                 """Неизвестные исключения"""
-                raise DBError(str(e))
+                exc = DBError(str(e))
+            if exc:
+                app_logger.error(
+                    f"DB error in {method.__name__}: {type(exc).__name__}: {exc}"
+                )
+                raise exc
+            return None
         wrapper.__wrapped_by_sql_handler__ = True
         return wrapper

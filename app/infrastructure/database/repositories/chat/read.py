@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.data_layer.models import Chat, ChatMember
+from app.infrastructure.database.models import Chat, ChatMember
 from app.shared.dto.chat import ChatDTO
 
 
@@ -11,13 +11,14 @@ class ChatReadRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_id(self, chat_id: UUID) -> ChatDTO | None:
+    async def find_by_id(self, chat_id: UUID) -> ChatDTO | None:
         """Чат по id или None."""
         stmt = (
             select(
                 Chat.id,
                 Chat.type,
                 Chat.is_active,
+                Chat.last_message_id,
                 Chat.last_message_at,
                 Chat.created_at,
                 Chat.updated_at

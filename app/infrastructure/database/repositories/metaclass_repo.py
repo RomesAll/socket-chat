@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from app.data_layer.repositories.exception_handler import SqlExceptionHandler
+from app.infrastructure.database.repositories.exception_handler import SqlExceptionHandler
 
 
 class RepoMeta(ABCMeta):

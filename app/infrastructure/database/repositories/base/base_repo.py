@@ -2,9 +2,9 @@ from dataclasses import is_dataclass, fields
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import TypeVar, Generic, Any, Sequence
-from app.data_layer.exceptions import RecordNotFound
-from app.data_layer.models import Base
-from app.data_layer.repositories.metaclass_repo import RepoMeta
+from app.infrastructure.database.exceptions import RecordNotFound
+from app.infrastructure.database.models import Base
+from app.infrastructure.database.repositories.metaclass_repo import RepoMeta
 from app.shared.dto.base import BaseSaveDTO, BaseUpdateDTO, UNSET
 
 TUpdateDto = TypeVar("TUpdateDto", bound=BaseUpdateDTO)

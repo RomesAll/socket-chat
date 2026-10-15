@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.shared.config import AppMode, create_config
-from app.data_layer.models import Base
+from app.infrastructure.database.models import Base
 
 
 mode_env = os.getenv('CHAT_APP_MODE', None)

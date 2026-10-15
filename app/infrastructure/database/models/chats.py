@@ -13,6 +13,10 @@ class Chat(UuidIsMixin, Base):
     last_message_at: Mapped[datetime | None] = mapped_column(
         default=None, nullable=True,
     )
+    last_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey('message.id', ondelete='SET NULL'),
+        default=None, nullable=True,
+    )
 
 
 class ChatMember(Base):
@@ -30,9 +34,5 @@ class ChatMember(Base):
         ForeignKey('message.id', ondelete='SET NULL'),
         default=None,
         nullable=True,
-    )
-    last_message_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey('message.id', ondelete='SET NULL'),
-        default=None, nullable=True,
     )
     mute: Mapped[bool] = mapped_column(default=False, nullable=False)

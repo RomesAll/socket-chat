@@ -1,12 +1,12 @@
 from uuid import UUID
-from app.data_layer.repositories.base.base_repo import (
+from app.infrastructure.database.repositories.base.base_repo import (
     BaseGetRepository,
     BaseSaveRepository,
     BaseUpdateRepository,
     BaseDeleteRepository
 )
 from app.shared.dto.room import RoomSaveDTO, RoomUpdateDTO
-from app.data_layer.models import Room
+from app.infrastructure.database.models import Room
 
 
 class RoomRepository(

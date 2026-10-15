@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.data_layer.models import ChatMember
+from app.infrastructure.database.models import ChatMember
 from app.shared.dto.chat import ChatMemberDTO
 from app.shared.dto.enums import ChatRole
 
@@ -21,7 +21,6 @@ class ChatMemberReadRepository:
                 ChatMember.role,
                 ChatMember.mute,
                 ChatMember.last_read_message_id,
-                ChatMember.last_message_id,
                 ChatMember.created_at,
                 ChatMember.updated_at
             )
@@ -42,7 +41,6 @@ class ChatMemberReadRepository:
                 ChatMember.role,
                 ChatMember.mute,
                 ChatMember.last_read_message_id,
-                ChatMember.last_message_id,
                 ChatMember.created_at,
                 ChatMember.updated_at
             )

@@ -1,12 +1,12 @@
 from datetime import datetime, date, timedelta
 from uuid import UUID
 from sqlalchemy import select
-from app.data_layer.repositories.base.base_repo import (
+from app.infrastructure.database.repositories.base.base_repo import (
     BaseGetRepository,
     BaseSaveRepository,
     BaseDeleteRepository
 )
-from app.data_layer.models import Message
+from app.infrastructure.database.models import Message
 from app.shared.dto.message import (
     MessageEncryptedSavedDTO,
     MessageEncryptedReadDTO,

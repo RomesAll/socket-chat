@@ -15,7 +15,7 @@ class Message(UuidIsMixin, Base):
         ForeignKey('user.id', ondelete='SET NULL'),
         nullable=True,
     )
-    body_encrypted: Mapped[str | None] = mapped_column(default=None, nullable=True)
+    body_encrypted: Mapped[bytes | None] = mapped_column(default=None, nullable=True)
     type: Mapped[MessageType]
     reply_to_message_id: Mapped[UUID] = mapped_column(default=None, nullable=True)
     forwarded_from_message_id: Mapped[UUID] = mapped_column(default=None, nullable=True)

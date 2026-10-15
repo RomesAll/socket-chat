@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 from mongotic import MongoBaseModel, mapped_field, Mapped
-from app.data_layer.models.events import EventType
+from app.infrastructure.database.models.events import EventType
 
 
 class Audit(MongoBaseModel):

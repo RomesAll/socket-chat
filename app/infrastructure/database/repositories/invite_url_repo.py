@@ -4,7 +4,7 @@ import secrets
 from mongotic import select
 from mongotic.asyncio import AsyncSession
 from app.business_logic.exceptions import UrlTokenNotFound, UrlTokenMaxUses, UrlTokenIsRevoked
-from app.data_layer.models.invite_url import InviteUrl
+from app.infrastructure.database.models.invite_url import InviteUrl
 from app.shared.dto.room import GenerateInviteToken
 
 
