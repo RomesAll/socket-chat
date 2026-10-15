@@ -2,6 +2,7 @@ from uuid import UUID
 from app.business_logic.mappers.chat_mapper import ChatMapper
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events import ChatMemberAdded, ChatMemberRoleChanged, ChatMemberRemoved, ChatOwnershipTransferred
+from app.infrastructure.redis import ChatCache
 from app.shared.dto.chat import ChatSaveDTO, ChatDTO, ChatUpdateDTO, ChatMemberDTO, ChatMemberSaveDTO, \
     ChatMemberUpdateDTO
 from app.shared.dto.enums import ChatRole
@@ -11,17 +12,23 @@ from app.shared.log_config import LogMixin
 class ChatService(LogMixin):
     """Сервис для управления комнатами"""
 
-    def __init__(self, uow: UnitOfWork, mapper: ChatMapper):
+    def __init__(self, uow: UnitOfWork, mapper: ChatMapper, cache: ChatCache):
         self._uow = uow
         self._mapper = mapper
+        self._cache = cache
 
     async def get(self, chat_id: UUID) -> ChatDTO:
         """
         Получить информацию о чате по ID.
         :exception RecordNotFound если не найдена запись.
         """
+        cached = await self._cache.get(chat_id)
+        if cached:
+            return cached
         chat_orm = await self._uow.chat_repo.get_record_by_id(chat_id)
-        return self._mapper.chat_to_dto(chat_orm)
+        chat_dto = self._mapper.chat_to_dto(chat_orm)
+        self._uow.add_after_commit(lambda: self._cache.save(chat_dto))
+        return chat_dto
 
     async def get_many(self, limit: int, offset: int) -> list[ChatDTO]:
         """Получить информацию о чатах с использованием пагинации."""
@@ -48,7 +55,6 @@ class ChatService(LogMixin):
         """Сохранить информацию о чате."""
         chat_orm = await self._uow.chat_repo.save(chat_dto)
         saved_chat = self._mapper.chat_to_dto(chat_orm)
-        self._uow.add_event(saved_chat)
         self.log_info(f"Создан чат {saved_chat.id}")
         return saved_chat
 
