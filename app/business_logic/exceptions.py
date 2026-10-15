@@ -131,3 +131,10 @@ class OwnerInRoomEmpty(Exception):
     def __init__(self, room_id):
         self.msg = f'У комнаты {room_id} не удалось найти владельца'
         super().__init__(self.msg)
+
+
+class AuthError(Exception):
+    """Ошибка аутентификации пользователя"""
+    def __init__(self):
+        self.msg = f'Передан неверный логин или пароль'
+        super().__init__(self.msg)
