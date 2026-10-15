@@ -1,269 +1,128 @@
-from datetime import datetime, timezone
-from uuid import uuid4, UUID
-
-from app.business_logic.exceptions import RefreshTokenInActive, VerifyCodeInCorrect, SaveIdRefreshTokenWhiteListError, \
-    VerifyCodeStorageError
-from app.business_logic.jwt_manager import JWTFacade
-from app.business_logic.psw_manager import PasswordManager
-from app.business_logic.redis_adapter import VerifyCodeStorage, Cache, JWTWhiteListCache, SessionKeyStorage
-from app.business_logic.websocket import UserConnectionManager
-from app.data_layer.models import User, RoleEnum
-from app.data_layer.models.events import EventType
+from dataclasses import asdict
+from app.business_logic.mappers.user_mapper import UserMapper
 from app.business_logic.unit_of_work import UnitOfWork
-from app.shared.dto import UserDtoSave
-from app.shared.dto.auth import LoginDtoRequest, LoginDtoResponse, SendType, VerifyCodeRequest, VerifyCodeResponse
-from app.shared.dto.dto_relation_ship import UserDtoGetWithRel
-from app.shared.dto.jwt import JWTRefreshTokenResponse, JWTTokenResponse
-from app.shared.dto.room import RoomMemberDtoGet, RoomDtoGet
-from app.shared.dto.user import (
-    UserDtoGet,
-    UserDtoBriefGet,
-    RegisterDtoGet,
-    UserDtoUpdateDefaultInfo,
-    UserDtoUpdateExtendedInfo,
-    UserDtoGetWithExtInfo
-)
+from app.domain.events import UserCreated, UserUpdated, UserPasswordChanged, UserDeleted
+from app.infrastructure.redis import UserCache
+from app.shared.dto.base import UNSET
+from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, UserUpdateDTO, UserEncryptedSaveDTO
 from app.shared.log_config import LogMixin
-from app.shared.config import get_config, AppMode, BaseConfig
-import random
-
-def _get_config() -> BaseConfig:
-    return get_config()
 
 
 class UserService(LogMixin):
-    """Сервис для управления пользователями"""
-    def __init__(
-            self,
-            uow: UnitOfWork,
-            verify_code_storage: VerifyCodeStorage,
-            psw_manager: type[PasswordManager],
-            jwt_white_list: JWTWhiteListCache,
-            cache: Cache,
-            jwt_facade: type[JWTFacade],
-            session_key_storage: SessionKeyStorage,
-            user_connections: UserConnectionManager
-    ):
+    """
+    Операции над агрегатом User.
+
+    Инварианты:\n
+    - Пароль хранится только в хешированном виде.
+    - User ID уникален.
+    - Email уникален.
+    """
+
+    def __init__(self, uow: UnitOfWork, mapper: UserMapper, cache: UserCache):
         self._uow = uow
-        self._verify_code_storage = verify_code_storage
-        self._psw_manager = psw_manager
+        self._mapper = mapper
         self._cache = cache
-        self._jwt_white_list = jwt_white_list
-        self._jwt_facade = jwt_facade
-        self._session_key_storage = session_key_storage
-        self._user_connections = user_connections
 
-    async def get_users_brief_info(self, limit: int, offset: int) -> list[UserDtoBriefGet]:
-        """Получение краткой информации о пользователях с пагинацией"""
-        async with self._uow as uow:
-            users_orm = await uow.user_repo.get_users(limit, offset, with_relation=False)
-            response = [
-                UserDtoBriefGet(**user.to_dict())
-                for user in users_orm
+    async def get(self, user_id: str) -> UserDtoGet:
+        """Получить информацию о пользователе по ID."""
+        cached = await self._cache.get(user_id)
+        if cached:
+            return cached
+        user_orm = await self._uow.user_repo.get_record_by_id(user_id)
+        return self._mapper.to_dto(user_orm)
+
+    async def get_brief(self, user_id: str) -> UserDtoBriefGet:
+        """Получить краткую информацию о пользователе по ID."""
+        cached = await self._cache.get(user_id)
+        if cached:
+            return cached.to_brief()
+        user_orm = await self._uow.user_repo.get_records(user_id)
+        return self._mapper.to_dto_brief(user_orm)
+
+    async def get_many(self, limit: int, offset: int) -> list[UserDtoGet]:
+        """Получить информацию о пользователях с использованием пагинации."""
+        user_many_orm = await self._uow.user_repo.get_records(limit, offset)
+        result_dtos = [
+            self._mapper.to_dto(user)
+            for user in user_many_orm
+        ]
+        return result_dtos
+
+    async def get_many_brief(self, limit: int, offset: int) -> list[UserDtoBriefGet]:
+        """Получить информацию о пользователях с использованием пагинации."""
+        user_many_ext_info = await self.get_many(limit, offset)
+        return [user_dto.to_brief() for user_dto in user_many_ext_info]
+
+    async def get_by_email(self, email: str) -> UserDtoGet:
+        """Получить информацию о пользователе по email."""
+        user_orm = await self._uow.user_repo.get_user_by_email(email)
+        return self._mapper.to_dto(user_orm)
+
+    async def save(self, user_dto: UserEncryptedSaveDTO) -> UserDtoGet:
+        """
+        Сохранить информацию о пользователе.
+
+        Алгоритм:\n
+        - Маппинг из DTO с открытым паролем -> DTO с захешированным.
+        - Сохранение пользователя в сессию БД.
+        - Маппинг в DTO из ORM.
+        """
+        user_orm = await self._uow.user_repo.save(user_dto)
+        saved_user = self._mapper.to_dto(user_orm)
+        self._uow.add_event(UserCreated(
+            user=saved_user
+        ))
+        self.log_info(f"Создан пользователь {saved_user.id}")
+        return saved_user
+
+    async def update(self, user_id: str, user_dto: UserUpdateDTO) -> UserDtoGet:
+        """
+        Обновить информацию о пользователе.
+
+        Алгоритм:\n
+        - Сохранение обновленных данных в сессии БД.
+        - Маппинг в DTO из ORM.
+        """
+        user_orm = await self._uow.user_repo.update(user_id, user_dto)
+        updated_user = self._mapper.to_dto(user_orm)
+        self._uow.add_event(UserUpdated(
+            user=updated_user,
+            changed_fields=[
+                key for key, value in asdict(user_dto)
+                if type(value) is not UNSET
             ]
-            return response
+        ))
+        self.log_info(f"Обновлён пользователь {updated_user.id}")
+        return updated_user
 
-    async def get_users_ext_info(self, limit: int, offset: int) -> list[UserDtoGet]:
-        """Получение расширенной информации о пользователях с пагинацией"""
-        async with self._uow as uow:
-            users_orm = await uow.user_repo.get_users(limit, offset, with_relation=True)
-            response = [
-                UserDtoGet(
-                    **user.to_dict(),
-                    user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict())
-                )
-                for user in users_orm
-            ]
-            return response
+    async def update_password(self, user_id: str, new_psw: bytes) -> UserDtoGet:
+        """
+        Обновить пароль пользователя.
 
-    async def get_users_with_rel(self, limit: int, offset: int) -> list[UserDtoGetWithRel]:
+        Алгоритм:\n
+        - Обновление информации в сессии БД.
+        - Маппинг в DTO из ORM.
         """
-        Получение расширенной информации о комнатах, в которых пользователь состоит
-        и владельцем которых он является
-        """
-        async with self._uow as uow:
-            users_orm = await uow.user_repo.get_users(limit, offset, with_relation=True)
-            response = [
-                UserDtoGetWithRel(
-                    **user.to_dict(),
-                    user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict()),
-                    room_members=[RoomMemberDtoGet(**room_member.to_dict()) for room_member in user.room_members],
-                    owned_rooms=[RoomDtoGet(**room.to_dict()) for room in users_orm.owned_rooms]
-                )
-                for user in users_orm
-            ]
-            return response
+        user_orm = await self._uow.user_repo.change_password(user_id, new_psw)
+        updated_user = self._mapper.to_dto(user_orm)
+        self._uow.add_event(UserPasswordChanged(
+            user_id=user_id
+        ))
+        self.log_info(f"Обновлён пароль пользователя {updated_user.id}")
+        return updated_user
 
-    async def _get_user(self, user_id) -> User:
-        async with self._uow as uow:
-            user_orm = await uow.user_repo.get_user_by_id(user_id, with_relation=False)
-            return user_orm
+    async def delete(self, user_id: str) -> UserDtoGet:
+        """
+        Удалить информацию о пользователе.
 
-    async def get_user_brief_info(self, user_id: str) -> UserDtoBriefGet:
-        """Получение краткой информации о пользователе по id"""
-        cache_data = await self._cache.get_user_info(user_id)
-        if cache_data:
-            return UserDtoBriefGet(**cache_data)
-        user_orm = await self._get_user(user_id)
-        user_ext_dto = UserDtoGet(
-            **user_orm.to_dict(),
-            user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict()),
-        )
-        user_brief_info_dto = UserDtoBriefGet(**user_orm.to_dict())
-        is_saved = await self._cache.save_user_info(user_ext_dto)
-        if not is_saved:
-           self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
-        return user_brief_info_dto
-
-    async def get_user_ext_info(self, user_id: str) -> UserDtoGet:
-        """Получение расширенной информации о пользователе по id"""
-        cache_data = await self._cache.get_user_info(user_id)
-        if cache_data:
-            return UserDtoGet(**cache_data)
-        user_orm = await self._get_user(user_id)
-        user_ext_dto = UserDtoGet(
-            **user_orm.to_dict(),
-            user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict()),
-        )
-        is_saved = await self._cache.save_user_info(user_ext_dto)
-        if not is_saved:
-            self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
-        return user_ext_dto
-
-    async def get_user_with_rel(self, user_id: str) -> UserDtoGetWithRel:
-        """Получение расширенной информации о пользователе по id с relationship"""
-        async with self._uow as uow:
-            user_orm = await uow.user_repo.get_user_by_id(user_id, with_relation=True)
-            response = UserDtoGetWithRel(
-                **user_orm.to_dict(),
-                user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict()),
-                room_members=[RoomMemberDtoGet(**room_member.to_dict()) for room_member in user_orm.room_members],
-                owned_rooms=[RoomDtoGet(**room.to_dict()) for room in user_orm.owned_rooms]
-            )
-        return response
-
-    async def add_user(self, new_user: UserDtoSave, type_send: SendType) -> LoginDtoResponse:
+        Алгоритм:\n
+        - Удаление информации из сессии БД.
+        - Маппинг в DTO из ORM.
         """
-        Добавление нового пользователя, алгоритм:
-        1) для переданного атрибута new_user.user_info.password высчитывается хеш;
-        2) сохраняет хеш в new_user.user_info.password;
-        3) генерируется соде для подтверждения;
-        4) сохраняется в бд;
-        5) регистрируется событие NEW_USER для последующей отправки кода на почту;
-        6) сохраняется информация о пользователе в кеш (после успешного commit).
-        :param type_send: Способ отправки кода подтрвеждения
-        :param new_user: DTO для создания нового пользователя
-        :return: RegisterDtoGet (если режим работы DEV, то код подтверждения будет внутри модели)
-        """
-        async with self._uow as uow:
-            hash_psw = self._psw_manager.hash_password(new_user.user_info.password)
-            new_user.user_info.password = hash_psw
-            user_orm = await uow.user_repo.save(new_user)
-            self.log_info(f'Пользователь {new_user.id} успешно сохранен в БД')
-            code = random.randint(10000, 99999)
-            await self._verify_code_storage.save(user_orm.id, code)
-            registered_user = RegisterDtoGet(
-                **user_orm.to_dict(),
-                user_info=UserDtoGetWithExtInfo(**user_orm.user_info.to_dict())
-            )
-            response = LoginDtoResponse(type_send=type_send)
-            if _get_config().mode not in (AppMode.DEV, ):
-                uow.add_event(
-                    event_name='Save new user',
-                    payload=registered_user.model_dump(),
-                    event_type=EventType.CREATE_NEW_USER
-                )
-                if type_send == SendType.EMAIL:
-                    uow.add_event(
-                        event_name='Send verify code',
-                        payload={'to': registered_user.user_info.email, 'code': code},
-                        event_type=EventType.SEND_VERIFY_CODE
-                    )
-            else:
-                response.code = code
-        cache_data = UserDtoGet.model_dump(registered_user)
-        is_saved = await self._cache.save_user_info(user_info=cache_data)
-        if not is_saved:
-           self.log_warning(f'Пользователь {new_user.id} не был сохранен в кеше')
-        return response
-
-    async def update_default_info_user(
-            self, user_id, update_user: UserDtoUpdateDefaultInfo
-    ) -> UserDtoGet:
-        """
-        Обновление базовой информации пользователя, алгоритм:
-        1) сохраняет информацию в бд;
-        2) регистрируется событие UPDATE_USER для последующего аудита;
-        3) сохраняется информация о пользователе в кеш (после успешного commit).
-        :param user_id: id пользователя
-        :param update_user: DTO для хранения атрибутов для обновления
-        :return:
-        """
-        async with self._uow as uow:
-            user = await uow.user_repo.update_default_info(user_id, update_user)
-            self.log_info(f'Обновлена информация о пользователе {user.id}')
-            uow.add_event(
-                event_name='Update user',
-                payload=user.to_dict(),
-                event_type=EventType.UPDATE_USER
-            )
-        user_dto_response = UserDtoGet(
-            **user.to_dict(),
-            user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict())
-        )
-        is_saved = await self._cache.save_user_info(user_info=user_dto_response)
-        if not is_saved:
-            self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
-        return user_dto_response
-
-    async def update_extended_info_user(
-            self, user_id, update_user: UserDtoUpdateExtendedInfo
-    ) -> UserDtoGet:
-        """
-        Обновление расширенной информации пользователя, алгоритм:
-        1) сохраняет информацию в бд;
-        2) регистрируется событие UPDATE_USER для последующего аудита;
-        3) сохраняется информация о пользователе в кеш (после успешного commit).
-        :param user_id: id пользователя
-        :param update_user: DTO для хранения атрибутов для обновления
-        :return:
-        """
-        async with self._uow as uow:
-            user = await uow.user_repo.update_extended_info(user_id, update_user)
-            self.log_info(f'Обновлена информация о пользователе {user.id}')
-            uow.add_event(
-                event_name='Update user',
-                payload=user.to_dict(),
-                event_type=EventType.UPDATE_USER
-            )
-        user_dto_response = UserDtoGet(**user.to_dict())
-        is_saved = await self._cache.save_user_info(user_info=user_dto_response)
-        if not is_saved:
-            self.log_warning(f'Пользователь {user_id} не был сохранен в кеше')
-        return user_dto_response
-
-    async def delete_user(self, user_id: str) -> UserDtoGet:
-        """
-        Удаление информации о пользователе, алгоритм:
-        1) удаляет информацию из бд;
-        2) регистрируется событие DELETE_USER для последующего аудита;
-        3) удаление пользователя из кеша.
-        :param user_id: id пользователя
-        :return:
-        """
-        async with self._uow as uow:
-            user = await uow.user_repo.delete(user_id)
-            self.log_info(f'Удалена информация о пользователе {user.id}')
-            response = UserDtoGet(
-                **user.to_dict(),
-                user_info=UserDtoGetWithExtInfo(**user.user_info.to_dict())
-            )
-            uow.add_event(
-                event_name='Delete user',
-                payload=response.model_dump(),
-                event_type=EventType.DELETE_USER
-            )
-        is_deleted = await self._cache.delete_user_info(str(user.id))
-        if not is_deleted:
-            self.log_warning(f'Пользователь {user_id} не был удален из кеша')
-        return response
+        user_orm = await self._uow.user_repo.delete(user_id)
+        deleted_user = self._mapper.to_dto(user_orm)
+        self._uow.add_event(UserDeleted(
+            user_id=user_id
+        ))
+        self.log_info(f"Удалён пользователь {deleted_user.id}")
+        return deleted_user
