@@ -1,4 +1,3 @@
-from typing import Callable
 from app.infrastructure.database.repositories import MessageRepository, UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession as SqlAsyncSession
 from app.infrastructure.database.repositories import ChatRepository, ChatReadRepository
@@ -31,7 +30,6 @@ class UnitOfWork(LogMixin):
 
         self._event_registry = event_registry
         self._events: list[DataclassInstance] = []
-        self._after_commit: list[Callable] = []
 
     async def __aenter__(self):
         return self
@@ -42,12 +40,6 @@ class UnitOfWork(LogMixin):
                 await self.sql_session.rollback()
             else:
                 await self.sql_session.commit()
-
-                for fn in self._after_commit:
-                    try:
-                        await fn()
-                    except Exception:
-                        self.log_error(f"after_commit failed: {fn}")
 
                 for event in self._events:
                     try:
@@ -64,10 +56,3 @@ class UnitOfWork(LogMixin):
     def add_event(self, event: DataclassInstance) -> None:
         """Зарегистрировать доменное событие для публикации после коммита."""
         self._events.append(event)
-
-    def add_after_commit(self, fn: Callable):
-        """
-        Добавить в коллекцию вызываемый объект,
-        который будет вып. после commit
-        """
-        self._after_commit.append(fn)
