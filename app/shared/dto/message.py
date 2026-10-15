@@ -10,7 +10,7 @@ class BaseMessageDTO:
     """DTO для хранения информации о сообщении."""
     id: UUID
     chat_id: UUID
-    sender_id: str
+    sender_id: str | None
     type: MessageType
     reply_to_message_id: UUID | None
     forwarded_from_message_id: UUID | None
@@ -24,14 +24,15 @@ class MessageSaveDTO(BaseMessageDTO):
 
 
 @dataclass(frozen=True, slots=True)
-class MessageEncryptedSavedDTO(BaseSaveDTO):
+class MessageEncryptedSavedDTO(BaseMessageDTO, BaseSaveDTO):
     """DTO для хранения информации о сообщении с зашифрованным сообщением."""
-    body_encrypted: str | None
+    body_encrypted: bytes | None
 
 
 @dataclass(frozen=True, slots=True)
 class MessageAttachmentSaveDTO(BaseSaveDTO):
     """DTO для сохранения информации о медиафайлах сообщения."""
+    id: UUID
     message_id: UUID
     file_name: str
     file_path: str
@@ -64,7 +65,7 @@ class MessageGetDTO(BaseMessageDTO):
 @dataclass(frozen=True, slots=True)
 class MessageEncryptedReadDTO(BaseMessageDTO):
     """Получить информацию о сообщения с зашифрованным текстом сообщения."""
-    body_encrypted: str | None
+    body_encrypted: bytes | None
     is_edited: bool
     created_at: datetime
     updated_at: datetime
