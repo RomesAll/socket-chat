@@ -55,3 +55,18 @@ class UserDtoGet(UserDtoBriefGet):
     role: RoleEnum
     email: str
     last_seen_at: datetime | None
+
+    def to_brief(self) -> UserDtoBriefGet:
+        return UserDtoBriefGet(
+            id=self.id,
+            display_name=self.display_name,
+            avatar_url=self.avatar_url,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class UserDtoGetWithAccessCode(UserDtoGet):
+    """DTO для получения информации о пользователе с кодом подтверждения."""
+    code: int
