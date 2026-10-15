@@ -3,6 +3,7 @@ from .presence_cache import PresenceCache
 from .room_cache import RoomCache
 from .unread_cache import UnreadCache
 from .user_cache import UserCache
+from .chat_cache import ChatCache
 
 __version__ = 'v0.3.0'
 __author__ = 'RomesAll'
@@ -11,5 +12,6 @@ __all__ = [
     'PresenceCache',
     'RoomCache',
     'UnreadCache',
-    'UserCache'
+    'UserCache',
+    'ChatCache'
 ]
