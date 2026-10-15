@@ -16,8 +16,11 @@ from app.infrastructure.mongo.analytics.documents import (
 from app.infrastructure.mongo.analytics.repositories import UserAnalyticsRepository
 
 
+#------------Обработчики событий сохранения пользователя-----------
+
+
 class SaveUserEvent:
-    """Добавить доменное событие сохранение пользователя в MongoDB."""
+    """Обработчик события сохранения пользователя для аналитики в Mongodb"""
 
     def __init__(self, repo: UserAnalyticsRepository):
         self._repo = repo
@@ -31,8 +34,21 @@ class SaveUserEvent:
         ))
 
 
+class SaveUserToCacheOnUserCreated:
+    """Обработчик события сохранения пользователя для кеша в Redis"""
+
+    def __init__(self, cache: UserCache):
+        self._cache = cache
+
+    async def handle(self, event: UserCreated) -> None:
+        await self._cache.save(event.user)
+
+
+#------------Обработчики событий обновлений пользователя-----------
+
+
 class UpdateUserEvent:
-    """Добавить доменное событие обновление пользователя в MongoDB."""
+    """Обработчик события обновления пользователя для аналитики в Mongodb"""
 
     def __init__(self, repo: UserAnalyticsRepository):
         self._repo = repo
@@ -43,6 +59,19 @@ class UpdateUserEvent:
             changed_fields=event.changed_fields,
             occurred_at=datetime.now(tz=timezone.utc)
         ))
+
+
+class InvalidateUserCacheOnUserUpdated:
+    """Обработчик события обновления пользователя для инвалидации кеша в Redis"""
+
+    def __init__(self, cache: UserCache):
+        self._cache = cache
+
+    async def handle(self, event: UserUpdated) -> None:
+        await self._cache.delete(event.user.id)
+
+
+#------------Обработчики событий удаления пользователя-----------
 
 
 class DeleteUserEvent:
@@ -58,6 +87,29 @@ class DeleteUserEvent:
         ))
 
 
+class InvalidateUserCacheOnUserDeleted:
+    """Обработчик события удаления пользователя для инвалидации кеша в Redis"""
+
+    def __init__(self, cache: UserCache):
+        self._cache = cache
+
+    async def handle(self, event: UserDeleted) -> None:
+        await self._cache.delete(event.user_id)
+
+
+class RevokeAllTokensOnUserDeleted:
+    """Обработчик события удаления пользователя для отзыва всех refresh-токены пользователя в Redis."""
+
+    def __init__(self, jwt_white_list: JWTWhiteListCache):
+        self._jwt_white_list = jwt_white_list
+
+    async def handle(self, event: UserDeleted) -> None:
+        await self._jwt_white_list.clear_user_token(event.user_id)
+
+
+#------------Обработчики событий смены пароля пользователя-----------
+
+
 class ChangePswUserEvent:
     """Добавить доменное событие обновления пользователя в MongoDB."""
 
@@ -69,46 +121,6 @@ class ChangePswUserEvent:
             user_id=event.user_id,
             occurred_at=datetime.now(tz=timezone.utc)
         ))
-
-
-class SaveUserToCacheOnUserCreated:
-    """Сохранить пользователя в кеш при создании."""
-
-    def __init__(self, cache: UserCache):
-        self._cache = cache
-
-    async def handle(self, event: UserCreated) -> None:
-        await self._cache.save(event.user)
-
-
-class InvalidateUserCacheOnUserUpdated:
-    """Сбросить кеш пользователя при обновлении."""
-
-    def __init__(self, cache: UserCache):
-        self._cache = cache
-
-    async def handle(self, event: UserUpdated) -> None:
-        await self._cache.delete(event.user.id)
-
-
-class InvalidateUserCacheOnUserDeleted:
-    """Сбросить кеш пользователя при удалении."""
-
-    def __init__(self, cache: UserCache):
-        self._cache = cache
-
-    async def handle(self, event: UserDeleted) -> None:
-        await self._cache.delete(event.user_id)
-
-
-class RevokeAllTokensOnUserDeleted:
-    """Отозвать все refresh-токены пользователя при удалении."""
-
-    def __init__(self, jwt_white_list: JWTWhiteListCache):
-        self._jwt_white_list = jwt_white_list
-
-    async def handle(self, event: UserDeleted) -> None:
-        await self._jwt_white_list.clear_user_token(event.user_id)
 
 
 class RevokeAllTokensOnUserPasswordChanged:

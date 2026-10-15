@@ -29,7 +29,9 @@ class UserService(LogMixin):
         if cached:
             return cached
         user_orm = await self._uow.user_repo.get_record_by_id(user_id)
-        return self._mapper.to_dto(user_orm)
+        user_dto = self._mapper.to_dto(user_orm)
+        self._uow.add_after_commit(lambda: self._cache.save(user_dto))
+        return user_dto
 
     async def get_brief(self, user_id: str) -> UserDtoBriefGet:
         """Получить краткую информацию о пользователе по ID."""
@@ -37,7 +39,9 @@ class UserService(LogMixin):
         if cached:
             return cached.to_brief()
         user_orm = await self._uow.user_repo.get_records(user_id)
-        return self._mapper.to_dto_brief(user_orm)
+        user_dto = self._mapper.to_dto(user_orm)
+        self._uow.add_after_commit(lambda: self._cache.save(user_dto))
+        return user_dto.to_brief()
 
     async def get_many(self, limit: int, offset: int) -> list[UserDtoGet]:
         """Получить информацию о пользователях с использованием пагинации."""
