@@ -2,7 +2,6 @@ from .chat_service import ChatService
 from .message_service import MessageService
 from .room_service import RoomService
 from .user_service import UserService
-from .session_service import SessionService
 from .token_service import TokenService
 from .verification_service import VerificationService
 
@@ -14,7 +13,6 @@ __all__ = [
     'MessageService',
     'RoomService',
     'UserService',
-    'SessionService',
     'TokenService',
     'VerificationService'
 ]
