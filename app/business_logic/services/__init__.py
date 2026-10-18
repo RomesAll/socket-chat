@@ -4,6 +4,11 @@ from .room_service import RoomService
 from .user_service import UserService
 from .token_service import TokenService
 from .verification_service import VerificationService
+from .invite_token_service import InviteTokenService
+from .msg_report_service import MessageReportService
+from .chat_report_service import ChatReportService
+from .room_report_service import RoomReportService
+from .user_report_service import UserReportService
 
 
 __version__ = 'v0.3.0'
@@ -14,5 +19,10 @@ __all__ = [
     'RoomService',
     'UserService',
     'TokenService',
-    'VerificationService'
+    'VerificationService',
+    'InviteTokenService',
+    'MessageReportService',
+    'ChatReportService',
+    'RoomReportService',
+    'UserReportService'
 ]
