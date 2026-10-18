@@ -1,7 +1,7 @@
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
+from app.domain.events.enums import ActionType
 from app.infrastructure.mongo.audit.documents.audit_docs import AuditDoc
-from app.shared.dto.enums import ActionType
 
 
 class AuditRepository:

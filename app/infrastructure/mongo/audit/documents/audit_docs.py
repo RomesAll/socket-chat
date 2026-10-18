@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
-from app.shared.dto.enums import ActionType
+from app.domain.events.enums import ActionType
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,7 +11,7 @@ class AuditDoc:
     actor_id: str
     target_id: str
     old_data: dict[str, Any] | None
-    new_data: dict[str, Any]
+    new_data: dict[str, Any] | None
     context: ContextDoc
     occurred_at: datetime
     created_at: datetime = field(default_factory=lambda :datetime.now(tz=timezone.utc))
