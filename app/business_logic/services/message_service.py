@@ -8,7 +8,9 @@ from app.shared.dto.message import (
     MessageEncryptedReadDTO,
     MessageEncryptedSenderGroupChat,
     MessageAttachmentSaveDTO,
-    MessageAttachmentGetDTO, MessageEncryptedSavedDTO,
+    MessageAttachmentGetDTO,
+    MessageEncryptedSavedDTO,
+    MessageEncryptedGetDTO,
 )
 from app.shared.log_config import LogMixin
 
@@ -20,6 +22,12 @@ class MessageService(LogMixin):
         self._uow = uow
         self._mapper = mapper
         self._cache = cache
+
+    async def get_message_by_chat(self, date_limit: date, chat_id: UUID) -> list[MessageEncryptedGetDTO]:
+        """Получить сообщения в чате"""
+        orm_messages = await self._uow.msg_repo.get_message_by_chat_with_rel(date_limit, chat_id)
+        dto_messages = self._mapper.to_read_dtos_with_rel(orm_messages)
+        return dto_messages
 
     async def get(self, message_id: UUID) -> MessageEncryptedReadDTO:
         """
