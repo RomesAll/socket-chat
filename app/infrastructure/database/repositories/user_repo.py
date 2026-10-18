@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from app.infrastructure.database.exceptions import RecordNotFound
 from app.infrastructure.database.repositories.base.base_repo import (
     BaseGetRepository,
@@ -7,6 +7,7 @@ from app.infrastructure.database.repositories.base.base_repo import (
     BaseUpdateRepository,
     BaseDeleteRepository
 )
+from app.shared.dto.enums import RoleEnum
 from app.shared.dto.user import UserEncryptedSaveDTO, UserUpdateDTO
 from app.infrastructure.database.models import User
 
@@ -21,6 +22,42 @@ class UserRepository(
 
     MODEL: type[User] = User
 
+    async def get_count_admin(self) -> int:
+        """Получить кол-во админов."""
+        stmt = (
+            select(func.count())
+            .select_from(self.MODEL)
+            .where(or_(
+                self.MODEL.role == RoleEnum.ADMIN,
+                self.MODEL.role == RoleEnum.SUPER_ADMIN
+            ))
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
+
+    async def get_count_users(self) -> int:
+        """Получить кол-во пользователей"""
+        stmt = (
+            select(func.count())
+            .select_from(self.MODEL)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
+
+    async def get_top_email_domain(self) -> dict[str, int]:
+        """Получить самые популярные домены для email адресов"""
+        domain = func.split_part(self.MODEL.email, '@', 2).label('domain')
+        count = func.count().label('count')
+
+        stmt = (
+            select(domain, count)
+            .group_by(domain)
+            .order_by(count.desc())
+        )
+        result = await self.session.execute(stmt)
+        return {row.domain: row.count for row in result.all()}
+
+
     async def get_user_by_email(self, email: str) -> User:
         """
         Получить пользователя по email.
@@ -34,6 +71,14 @@ class UserRepository(
         user_info = await self.session.scalar(stmt)
         if not user_info:
             raise RecordNotFound([email], self.MODEL.__tablename__, 'email')
+        return user_info
+
+    async def change_role(self, user_id: str, new_role: RoleEnum):
+        """Сменить роль пользователя."""
+        user_info = await self.get_record_by_id(user_id)
+        if user_info.role != new_role:
+            user_info.role = new_role
+            await self.session.flush()
         return user_info
 
     async def change_email(self, user_id: str, new_email: str) -> User:
