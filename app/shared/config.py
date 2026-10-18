@@ -87,7 +87,8 @@ class BaseConfig(BaseSettings):
     log_info: LogLevelInfo
     mongodb: MongoDb
     smtp: SmtpConfig
-    app_key: bytes
+    app_token: bytes
+    app_key: str
     mode: AppMode = AppMode.DEV
 
     @field_validator('upload_file_path')
