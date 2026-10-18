@@ -3,7 +3,9 @@ from app.business_logic.mappers.user_mapper import UserMapper
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events import UserCreated, UserUpdated, UserPasswordChanged, UserDeleted
 from app.infrastructure.redis import UserCache
-from app.shared.dto.base import UNSET
+from app.infrastructure.security import PasswordManager
+from app.shared.dto.base import UNSET, _UnsetType
+from app.shared.dto.enums import RoleEnum
 from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, UserUpdateDTO, UserEncryptedSaveDTO
 from app.shared.log_config import LogMixin
 
@@ -18,10 +20,30 @@ class UserService(LogMixin):
     - Email уникален.
     """
 
-    def __init__(self, uow: UnitOfWork, mapper: UserMapper, cache: UserCache):
+    def __init__(self, uow: UnitOfWork, mapper: UserMapper, cache: UserCache, psw_manager: type[PasswordManager]):
         self._uow = uow
         self._mapper = mapper
         self._cache = cache
+        self._psw_manager = psw_manager
+
+
+    def hash_password(self, psw: str) -> bytes:
+        """Хеширование пароля"""
+        return self._psw_manager.hash_password(psw)
+
+    async def verify_password(self, user_id: str, password: str) -> bool:
+        """
+        Проверить пароль пользователя.
+
+        Алгоритм:
+        - Получить ORM-модель.
+        - Сравнить с переданным паролем через psw_manager.
+        """
+        user_orm = await self._uow.user_repo.get_record_by_id(user_id)
+        return self._psw_manager.check_equal_psw(
+            password=password,
+            hashed_password=user_orm.password,
+        )
 
     async def get(self, user_id: str) -> UserDtoGet:
         """Получить информацию о пользователе по ID."""
@@ -92,14 +114,14 @@ class UserService(LogMixin):
         self._uow.add_event(UserUpdated(
             user=updated_user,
             changed_fields=[
-                key for key, value in asdict(user_dto)
-                if type(value) is not UNSET
+                key for key, value in asdict(user_dto).items()
+                if type(value) is not _UnsetType
             ]
         ))
         self.log_info(f"Обновлён пользователь {updated_user.id}")
         return updated_user
 
-    async def update_password(self, user_id: str, new_psw: bytes) -> UserDtoGet:
+    async def update_password(self, user_id: str, new_psw: str) -> UserDtoGet:
         """
         Обновить пароль пользователя.
 
@@ -107,12 +129,19 @@ class UserService(LogMixin):
         - Обновление информации в сессии БД.
         - Маппинг в DTO из ORM.
         """
-        user_orm = await self._uow.user_repo.change_password(user_id, new_psw)
+        user_orm = await self._uow.user_repo.change_password(user_id, new_psw.encode())
         updated_user = self._mapper.to_dto(user_orm)
         self._uow.add_event(UserPasswordChanged(
             user_id=user_id
         ))
         self.log_info(f"Обновлён пароль пользователя {updated_user.id}")
+        return updated_user
+
+    async def update_role(self, user_id: str, new_role: RoleEnum):
+        """Обновить роль пользователя"""
+        user_orm = await self._uow.user_repo.change_role(user_id, new_role)
+        updated_user = self._mapper.to_dto(user_orm)
+        self.log_info(f"Для пользователя {user_id} была изменена роль на {new_role}")
         return updated_user
 
     async def delete(self, user_id: str) -> UserDtoGet:
