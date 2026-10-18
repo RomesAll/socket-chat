@@ -17,6 +17,10 @@ class ChatService(LogMixin):
         self._mapper = mapper
         self._cache = cache
 
+    async def find_between_users(self, user_1: str, user_2: str) -> ChatDTO | None:
+        """Получить чат между двумя пользователями"""
+        return self._uow.chat_read_repo.find_between_users(user_1, user_2)
+
     async def get(self, chat_id: UUID) -> ChatDTO:
         """
         Получить информацию о чате по ID.
