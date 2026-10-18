@@ -138,3 +138,31 @@ class AuthError(Exception):
     def __init__(self):
         self.msg = f'Передан неверный логин или пароль'
         super().__init__(self.msg)
+
+
+class PermissionError(Exception):
+    """Ошибка прав доступа"""
+    def __init__(self, msg):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class AlreadyExistsError(Exception):
+    """Пользователь уже есть в чате"""
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class TargetSendNotFound(Exception):
+    """Ненайдена цель для отправки сообщения"""
+    def __init__(self):
+        self.msg = 'Для отправки сообщения не была найдена цель'
+        super().__init__(self.msg)
+
+
+class ReplyMessageForwardedError(Exception):
+    """Сообщение не может быть ответом и пересылкой другого сообщения"""
+    def __init__(self):
+        self.msg = 'Сообщение не может содержать ответ и пересылку'
+        super().__init__(self.msg)
