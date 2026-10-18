@@ -34,11 +34,17 @@ class JWTWhiteListCache:
         return bool(await self.client.delete(f'{self._prefix}:{user_id}:{token_id}'))
 
     @exception_handler(generate_exc=True)
-    async def clear_user_token(self, user_id: str) -> int:
+    async def clear_user_token(self, user_id: str, exclude_token_ids: set[UUID] | None = None) -> int:
         """Очистка всех refresh токенов пользователя."""
+        exclude_keys = set()
+        if exclude_token_ids:
+            exclude_keys = {f'{self._prefix}:{user_id}:{tid}' for tid in exclude_token_ids}
         pattern = f'{self._prefix}:{user_id}:*'
         deleted = 0
         async for key in self.client.scan_iter(match=pattern):
+            key_str = key.decode() if isinstance(key, bytes) else key
+            if key_str in exclude_keys:
+                continue
             deleted += await self.client.delete(key)
         return deleted
 
