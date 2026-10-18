@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from app.infrastructure.database.repositories.base.base_repo import (
     BaseGetRepository,
     BaseSaveRepository,
@@ -22,6 +23,26 @@ class MessageRepository(
     """Репозиторий для работы с сообщениями"""
 
     MODEL: type[Message] = Message
+
+    async def get_message_by_chat_with_rel(self, date_limit: date, chat_id: UUID) -> list[Message]:
+        """Получить сообщения в чате с relationship"""
+        start = datetime.combine(date_limit, datetime.min.time())
+        end = start + timedelta(days=1)
+        stmt = (
+            select(self.MODEL)
+            .where(
+                self.MODEL.chat_id == chat_id,
+                self.MODEL.created_at >= start,
+                self.MODEL.created_at < end
+            )
+            .order_by(self.MODEL.created_at)
+            .options(
+                joinedload(self.MODEL.reply_to),
+                joinedload(self.MODEL.forwarded_from)
+            )
+        )
+        orm_messages = (await self.session.execute(stmt)).all()
+        return orm_messages
 
     async def get_message_by_chat(self, date_limit: date, chat_id: UUID) -> list[MessageEncryptedReadDTO]:
         """
@@ -87,7 +108,7 @@ class MessageRepository(
             await self.session.flush()
         return msg
 
-    async def update_message(self, message_id: UUID, new_encr_msg: str) -> Message:
+    async def update_message(self, message_id: UUID, new_encr_msg: bytes) -> Message:
         """Обновить сообщение отправителя."""
         msg = await self.get_record_by_id(message_id)
         msg.body_encrypted = new_encr_msg
