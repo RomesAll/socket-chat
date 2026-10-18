@@ -52,15 +52,12 @@ class WSBroker:
             return
         try:
             async for message in self._pubsub.listen():
-                if self._stopping:
-                    break
-                if message.get('type_package') != 'message':
-                    continue
                 try:
+                    if self._stopping:
+                        break
+                    if message.get('type') != 'message':
+                        continue
                     package = json.loads(message['data'])
-                except Exception:
-                    continue
-                try:
                     await self._dispatch_package(package)
                 except Exception:
                     continue
