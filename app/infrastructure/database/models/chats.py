@@ -14,7 +14,6 @@ class Chat(UuidIsMixin, Base):
         default=None, nullable=True,
     )
     last_message_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey('message.id', ondelete='SET NULL'),
         default=None, nullable=True,
     )
 
@@ -31,7 +30,6 @@ class ChatMember(Base):
     )
     role: Mapped[ChatRole] = mapped_column(default=ChatRole.MEMBER)
     last_read_message_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey('message.id', ondelete='SET NULL'),
         default=None,
         nullable=True,
     )
