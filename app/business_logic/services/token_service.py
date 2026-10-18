@@ -114,7 +114,7 @@ class TokenService(LogMixin):
         await self._jwt_white_list.delete_refresh_token(user_id, refresh_id)
         self.log_info(f"Отозван refresh токен: user_id={user_id}, refresh_id={refresh_id}")
 
-    async def revoke_all(self, user_id: str) -> None:
+    async def revoke_all(self, user_id: str, exclude_token_ids: set[UUID] | None = None) -> None:
         """
         Отозвать все refresh токены пользователя.
 
@@ -122,5 +122,5 @@ class TokenService(LogMixin):
         - Удаляет все refresh_id пользователя из white list.
         - Логирует факт отзыва.
         """
-        await self._jwt_white_list.clear_user_token(user_id)
+        await self._jwt_white_list.clear_user_token(user_id, exclude_token_ids)
         self.log_info(f"Отозваны все refresh токены пользователя {user_id}")
