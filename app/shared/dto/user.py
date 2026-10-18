@@ -70,3 +70,10 @@ class UserDtoGet(UserDtoBriefGet):
 class UserDtoGetWithAccessCode(UserDtoGet):
     """DTO для получения информации о пользователе с кодом подтверждения."""
     code: int
+
+
+@dataclass(frozen=True, slots=True)
+class UserDtoGetWithOnlineStatus:
+    """DTO для получения информации о пользователе с online статусом."""
+    user: UserDtoBriefGet
+    is_online: bool

@@ -31,6 +31,7 @@ class RoomDTO:
     title: str
     description: str | None
     avatar_url: str | None
+    max_users: int
     created_at: datetime
     updated_at: datetime
 

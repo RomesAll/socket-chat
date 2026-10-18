@@ -18,6 +18,7 @@ class ChatUpdateDTO(BaseUpdateDTO):
     """DTO для обновления чата."""
     is_active: bool | None | _UnsetType = UNSET
     last_message_at: datetime | None | _UnsetType = UNSET
+    last_message_id: UUID | None | _UnsetType = UNSET
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +28,7 @@ class ChatDTO:
     type: ChatType
     is_active: bool
     last_message_at: datetime | None
+    last_message_id: UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -56,6 +58,5 @@ class ChatMemberDTO:
     role: ChatRole
     mute: bool
     last_read_message_id: UUID | None
-    last_message_id: UUID | None
     created_at: datetime
     updated_at: datetime

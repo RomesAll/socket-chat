@@ -1,43 +1,57 @@
-from datetime import datetime, timezone
-from enum import Enum
-from pydantic import BaseModel, SecretStr, Field
+from dataclasses import dataclass
+from datetime import datetime
+from app.shared.dto.enums import SendType, RoleEnum
 
 
-class SendType(str, Enum):
-    """Причисление с типом отправки кода"""
-    EMAIL = 'email'
-
-
-class LoginDtoRequest(BaseModel):
+@dataclass(frozen=True, slots=True)
+class LoginDtoRequest:
     """DTO для входа в систему"""
     user_id: str
-    password: bytes
+    password: str
 
 
-class LoginDtoResponse(BaseModel):
+@dataclass(frozen=True, slots=True)
+class LoginDtoResponse:
     """DTO для ответа после входа, регистрации"""
     code: int | None = None
-    type_send: SendType = SendType.EMAIL
 
 
-class LoginOrRegisterDtoResponse(BaseModel):
+@dataclass(frozen=True, slots=True)
+class LoginOrRegisterDtoResponse:
     """DTO для получения информации о пользователе после входа или регистрации"""
     send_code: SendType
-    time_send: datetime = Field(default_factory=lambda : datetime.now(tz=timezone.utc))
+    time_send: datetime
 
 
-class VerifyCodeRequest(BaseModel):
+@dataclass(frozen=True, slots=True)
+class VerifyCodeRequest:
     """DTO для передачи и проверки кода подтверждения"""
     user_id: str
     code: int
 
 
-class RefreshVerifyCodeRequest(BaseModel):
+@dataclass(frozen=True, slots=True)
+class RefreshVerifyCodeRequest:
     """DTO для обновления кода"""
     user_id: str
 
 
-class VerifyCodeResponse(BaseModel):
+@dataclass(frozen=True, slots=True)
+class VerifyCodeResponse:
     """Класс для получения access и refresh токенов"""
+    access_token: str
+    refresh_token: str
+
+
+@dataclass(frozen=True, slots=True)
+class CreateAuthToken:
+    """Класс для создания пары access и refresh токенов"""
+    user_id: str
+    sub: str
+    role: RoleEnum
+
+
+@dataclass(frozen=True)
+class TokensDto:
     access_token: str
     refresh_token: str

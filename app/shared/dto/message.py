@@ -6,6 +6,76 @@ from app.shared.dto.enums import MessageType
 
 
 @dataclass(frozen=True, slots=True)
+class ReplyEncryptedMessageDTO:
+    id: UUID
+    type: MessageType
+    body_encrypted: bytes | None
+
+
+@dataclass(frozen=True, slots=True)
+class ForwardedEncryptedMessageDTO:
+    forwarded_from_message_id: UUID
+    type: MessageType
+    forwarded_from_user_id: str | None
+    body_encrypted: bytes | None
+
+
+@dataclass(frozen=True, slots=True)
+class MessageEncryptedGetDTO:
+    id: UUID
+    chat_id: UUID
+    sender_id: str | None
+    type: MessageType
+    body_encrypted: bytes | None
+    reply_to: ReplyEncryptedMessageDTO | None
+    forwarded_from: ForwardedEncryptedMessageDTO | None
+    is_edited: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ReplyMessageDTO:
+    id: UUID
+    type: MessageType
+    text: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ForwardedMessageDTO:
+    forwarded_from_message_id: UUID
+    forwarded_from_user_id: str | None
+    type: MessageType
+    text: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class MessageGetDTO:
+    id: UUID
+    chat_id: UUID
+    sender_id: str | None
+    type: MessageType
+    text: str | None
+    reply_to: ReplyMessageDTO | None
+    forwarded_from: ForwardedMessageDTO | None
+    is_edited: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class SendMessageCommand:
+    """Команда отправки сообщения из запроса."""
+    chat_id: UUID | None = None
+    recipient_id: str | None = None
+    type: MessageType = MessageType.TEXT
+    text: str | None = None
+    reply_to_message_id: UUID | None = None
+    forwarded_from_message_id: UUID | None = None
+    forwarded_from_user_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BaseMessageDTO:
     """DTO для хранения информации о сообщении."""
     id: UUID
@@ -49,15 +119,6 @@ class MessageAttachmentGetDTO:
     file_path: str
     mime_type: str
     size: int
-    created_at: datetime
-    updated_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
-class MessageGetDTO(BaseMessageDTO):
-    """Получить информацию о сообщения с открытым текстом сообщения."""
-    text: str | None
-    is_edited: bool
     created_at: datetime
     updated_at: datetime
 
