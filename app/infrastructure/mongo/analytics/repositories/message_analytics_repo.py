@@ -40,11 +40,11 @@ class MessageAnalyticsRepository:
         ])
         return [{"day": d["_id"], "count": d["count"]} async for d in cursor]
 
-    async def count_all_msg_send_by_days(self, days: int = 30):
+    async def count_all_msg_send_by_days(self, days: int = 30) -> list[dict]:
         """Посчитать сообщения по дням (для всех чатов)."""
         return await self._count_msg({}, days)
 
-    async def count_chat_msg_send_by_days(self, chat_id: UUID, days: int = 30):
+    async def count_chat_msg_send_by_days(self, chat_id: UUID, days: int = 30) -> list[dict]:
         """Посчитать сообщения по дням (для чата)."""
         bson_chat_id = Binary.from_uuid(
             chat_id, uuid_representation=UuidRepresentation.STANDARD
