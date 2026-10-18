@@ -30,16 +30,16 @@ class ChatAnalyticsRepository:
     async def insert_change_ownership(self, doc: ChatChangeOwnerDoc):
         await self._ownership.insert_one(asdict(doc))
 
-    async def count_added_member(self, days: int = 30) -> list[dict]:
+    async def get_added_member(self, chat_id: UUID, days: int = 30) -> list[dict]:
         """Посчитать кол-во добавленных участников"""
         since = datetime.now(tz=timezone.utc) - timedelta(days=days)
-        cursor = self._member_added.find({'occurred_at': {'$gte': since}})
+        cursor = self._member_added.find({'chat_id': chat_id, 'occurred_at': {'$gte': since}})
         return [member async for member in cursor]
 
-    async def count_removed_member(self, days: int = 30) -> list[dict]:
+    async def get_removed_member(self, chat_id: UUID, days: int = 30) -> list[dict]:
         """Посчитать кол-во удаленных участников"""
         since = datetime.now(tz=timezone.utc) - timedelta(days=days)
-        cursor = self._member_removed.find({'occurred_at': {'$gte': since}})
+        cursor = self._member_removed.find({'chat_id': chat_id, 'occurred_at': {'$gte': since}})
         return [member async for member in cursor]
 
     async def find_changed_owner(self, chat_id: UUID) -> list[dict]:
