@@ -116,6 +116,7 @@ class BaseUpdateRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TUpdate
             setattr(record_info, f.name, value)
 
         await self.session.flush()
+        await self.session.refresh(record_info)
         return record_info
 
 
