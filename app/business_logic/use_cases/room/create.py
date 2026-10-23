@@ -4,6 +4,7 @@ from app.business_logic.services import ChatService, RoomService
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events.audit import AuditEvent, Context
 from app.domain.events.enums import ActionType
+from app.infrastructure.websocket import WSBroker
 from app.shared.dto.audit import RequestMeta
 from app.shared.dto.chat import ChatMemberSaveDTO, ChatSaveDTO
 from app.shared.dto.enums import ChatRole, ChatType
@@ -27,10 +28,12 @@ class CreateRoomUseCase(LogMixin):
         chat_service: ChatService,
         room_service: RoomService,
         uow: UnitOfWork,
+        ws_broker: WSBroker
     ):
         self._chat_service = chat_service
         self._room_service = room_service
         self._uow = uow
+        self._ws_broker = ws_broker
 
     async def execute(
         self,
@@ -63,6 +66,14 @@ class CreateRoomUseCase(LogMixin):
             user_id=actor_id,
             role=ChatRole.OWNER,
         ))
+
+        self._uow.add_after_commit(
+            lambda: self._ws_broker.publish_join_chat(
+                action_type="join_chat",
+                chat_id=chat.id,
+                user_id=actor_id
+            )
+        )
 
         # Сохранить события создания комнаты
         self._uow.add_event(AuditEvent(
