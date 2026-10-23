@@ -14,12 +14,6 @@ from app.shared.log_config import LogMixin
 class ChangeChatMemberRoleUseCase(LogMixin):
     """
     Сменить роль участника чата.
-
-    Сценарий:
-    - Проверить, что актор — OWNER.
-    - Нельзя менять роль OWNER.
-    - Сменить роль.
-    - Записать audit-событие.
     """
 
     def __init__(
@@ -42,31 +36,26 @@ class ChangeChatMemberRoleUseCase(LogMixin):
     ) -> ChatMemberDTO:
         time_now = datetime.now(tz=timezone.utc)
 
-        # Проверить права
-        owner_id = await self._room_service.get_owner_room(chat_id)
-        if owner_id != actor_id:
-            self.log_warning(
-                f"Пользователь {actor_id} пытался сменить роль в {chat_id}"
-            )
-            raise PermissionError(
-                f"Пользователь {actor_id} не владелец чата {chat_id}"
-            )
-
-        # Нельзя изменить роль у владельца
-        if new_role == ChatRole.OWNER:
-            raise PermissionError("Нельзя назначить OWNER через смену роли")
-
-        # Получить информацию об участнике
-        target = await self._chat_service.get_member(chat_id, user_id)
-
-        # Нельзя изменить роль самому себе
+        # Нельзя изменить свою роль
         if actor_id == user_id:
             raise PermissionError("Нельзя менять свою роль")
 
+        # Получить участников
+        actor = await self._chat_service.get_member(chat_id, actor_id)
+        target = await self._chat_service.get_member(chat_id, user_id)
+
+        # Проверка прав: актор должен иметь право управлять ролью цели
+        if not actor.role.can_manage(target.role):
+            raise PermissionError(f"Пользователь {actor_id} не может изменить роль {user_id}")
+
+        # Если роль не меняется — ничего не делаем
         if target.role == new_role:
             return target
 
-        # Обновить роль
+        if new_role == ChatRole.OWNER:
+            await self._chat_service.set_role(chat_id, actor_id, ChatRole.ADMIN)
+
+        # Обновить роль в БД
         updated = await self._chat_service.set_role(chat_id, user_id, new_role)
 
         # Сохранить событие
@@ -76,11 +65,11 @@ class ChangeChatMemberRoleUseCase(LogMixin):
             target_id=user_id,
             old_data={
                 "chat_id": str(chat_id),
-                "role": target.role.value,
+                "role": target.role.value if hasattr(target.role, 'value') else target.role,
             },
             new_data={
                 "chat_id": str(chat_id),
-                "role": new_role.value,
+                "role": new_role.value if hasattr(new_role, 'value') else new_role,
             },
             context=Context(
                 ip=request_meta.ip,
