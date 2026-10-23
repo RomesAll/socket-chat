@@ -88,6 +88,7 @@ class BaseSaveRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TSaveDto]
         orm_model = self.MODEL(**data)
         self.session.add(orm_model)
         await self.session.flush()
+        await self.session.refresh(orm_model)
         return orm_model
 
 
@@ -101,19 +102,20 @@ class BaseUpdateRepository(BaseRepository[TOrmModel], Generic[TOrmModel, TUpdate
 
     async def update(self, record_id: Any, request: TUpdateDto) -> TOrmModel:
         if not is_dataclass(request):
-            raise TypeError(
-                f"{type(request).__name__} must be a dataclass"
-            )
+            raise TypeError(f"{type(request).__name__} объект должен быть dataclass")
 
         record_info: TOrmModel | None = await self.session.get(self.MODEL, record_id)
+
         if record_info is None:
             raise RecordNotFound([record_id], self.MODEL.__tablename__, 'id')
 
-        for f in fields(request):
-            value = getattr(request, f.name)
-            if value is UNSET:
-                continue
-            setattr(record_info, f.name, value)
+        update_raw = request.get_not_null_attrs()
+
+        if not update_raw:
+            return record_info
+
+        for key, val in update_raw.items():
+            setattr(record_info, key, val)
 
         await self.session.flush()
         await self.session.refresh(record_info)

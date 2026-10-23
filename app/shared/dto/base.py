@@ -1,5 +1,5 @@
 from typing import Final
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,6 +10,16 @@ class BaseSaveDTO:
 @dataclass(frozen=True, slots=True)
 class BaseUpdateDTO:
     """Базовый класс для всех DTO обновления."""
+
+    def get_not_null_attrs(self) -> dict:
+        """Получить все заполненные поля"""
+        result = {}
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if value is UNSET:
+                continue
+            result[f.name] = value
+        return result
 
 
 class _UnsetType:
