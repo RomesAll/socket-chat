@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
-from app.business_logic.services import UserService, VerificationService
+from uuid import uuid4
+from app.business_logic.services import UserService, VerificationService, ChatService
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events.audit import AuditEvent, Context
 from app.domain.events.enums import ActionType
 from app.infrastructure.email import EmailSender
 from app.shared.dto.audit import RequestMeta
 from app.shared.dto.auth import LoginOrRegisterDtoResponse
-from app.shared.dto.enums import SendType
+from app.shared.dto.chat import ChatSaveDTO, ChatMemberSaveDTO
+from app.shared.dto.enums import SendType, ChatType
 from app.shared.dto.user import UserSaveDTO, UserEncryptedSaveDTO
 from app.shared.log_config import LogMixin
 
@@ -26,6 +28,7 @@ class RegisterUserUseCase(LogMixin):
     def __init__(
         self,
         user_service: UserService,
+        chat_service: ChatService,
         verification_service: VerificationService,
         email_sender: EmailSender,
         uow: UnitOfWork,
@@ -33,6 +36,7 @@ class RegisterUserUseCase(LogMixin):
         self._user_service = user_service
         self._verification_service = verification_service
         self._email_sender = email_sender
+        self._chat_service = chat_service
         self._uow = uow
 
     async def execute(
@@ -74,6 +78,16 @@ class RegisterUserUseCase(LogMixin):
                 source=request_meta.source,
             ),
             occurred_at=time_now,
+        ))
+
+        # Добавить чат по умолчанию для пользователя
+        default_chat = await self._chat_service.save(ChatSaveDTO(
+            id=uuid4(),
+            type=ChatType.PRIVATE,
+        ))
+        await self._chat_service.add_member(ChatMemberSaveDTO(
+            chat_id=default_chat.id,
+            user_id=request.id
         ))
 
         # Отправка кода подтверждения после commit
