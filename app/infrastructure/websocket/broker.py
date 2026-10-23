@@ -73,6 +73,8 @@ class WSBroker:
         type_message = target.get('type_message')
 
         match type_message:
+            case 'user_status':
+                await self.manager.send_user_status(payload)
             case 'chat':
                 await self.manager.send_to_chat(UUID(target['chat_id']), payload)
             case 'user':
@@ -103,6 +105,19 @@ class WSBroker:
             'payload': {
                 'action_type': action_type,
                 'data': data
+            },
+        })
+
+    async def publish_user_status(self, user_id: str, is_online: bool, chat_ids: list[UUID] | None = None):
+        await self._publish({
+            'target': {'type_message': 'user_status', 'user_id': user_id},
+            'payload': {
+                'action_type': 'user_status',
+                "data": {
+                    "user_id": user_id,
+                    "status": is_online,
+                    "chat_ids": [str(c) for c in chat_ids] if chat_ids else []
+                }
             },
         })
 
