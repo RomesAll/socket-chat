@@ -28,16 +28,26 @@ class AuditRepository:
         )
         return [doc async for doc in cursor]
 
-    async def find_by_target(
-        self, actor_type: ActionType, target_id: str, limit: int = 100, offset: int = 0
-    ) -> list[dict]:
-        """Получить историю действий над объектом."""
+    async def find_all(self, days: int = 30, limit: int = 1000, offset: int = 0) -> list[dict]:
+        since = datetime.now(tz=timezone.utc) - timedelta(days=days)
         cursor = (
             self._collection
-            .find({"actor_type": actor_type.value, "target_id": target_id})
+            .find({"occurred_at": {"$gte": since}})
             .sort("occurred_at", -1)
             .skip(offset)
             .limit(limit)
+        )
+        return [doc async for doc in cursor]
+
+    async def find_by_actor_target(
+            self, actor_id: str, target: str, days: int = 30
+    ) -> list[dict]:
+        """Получить все события актора над конкретным объектом за промежуток времени."""
+        since = datetime.now(tz=timezone.utc) - timedelta(days=days)
+        cursor = (
+            self._collection
+            .find({'actor_id': actor_id, 'target_id': target, 'occurred_at': {'$gte': since}})
+            .sort([("occurred_at", -1)])  # <--- ИСПРАВЛЕНО
         )
         return [doc async for doc in cursor]
 
@@ -48,7 +58,7 @@ class AuditRepository:
         since = datetime.now(tz=timezone.utc) - timedelta(days=days)
         cursor = (
             self._collection
-            .find({"action": action.value, "occurred_at": {"$gte": since}})
+            .find({"actor_type": action.value, "occurred_at": {"$gte": since}})
             .sort("occurred_at", -1)
             .skip(offset)
             .limit(limit)
@@ -64,14 +74,16 @@ class AuditRepository:
         )
         return [doc async for doc in cursor]
 
-    async def find_by_actor_target(
-            self, actor_id: str, target: str, days: int = 30
+
+    async def find_by_target(
+        self, action: ActionType, target_id: str, limit: int = 100, offset: int = 0
     ) -> list[dict]:
-        """Получить все события актора над конкретным объектом за промежуток времени."""
-        since = datetime.now(tz=timezone.utc) - timedelta(days=days)
+        """Получить историю действий над объектом."""
         cursor = (
             self._collection
-            .find({'actor_id': actor_id, 'target': target, 'occurred_at': {'$gte': since}})
-            .sort({'occurred_at', -1})
+            .find({"actor_type": action.value, "target_id": target_id})
+            .sort("occurred_at", -1)
+            .skip(offset)
+            .limit(limit)
         )
         return [doc async for doc in cursor]
