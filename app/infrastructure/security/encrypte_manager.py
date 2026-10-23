@@ -11,9 +11,11 @@ class SymmetricEncode:
         token = self._fernet.encrypt(message.encode())
         return token
 
-    def decrypt(self, token: bytes) -> str:
+    def decrypt(self, token: bytes) -> str | None:
         """Расшифровка сообщения"""
         try:
+            if not token:
+                return None
             message = self._fernet.decrypt(token)
             return message.decode()
         except InvalidToken:
