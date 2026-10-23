@@ -14,7 +14,7 @@ class ChatMessageCache(LogMixin):
     Адаптер для кеша истории сообщений чата.
     """
 
-    def __init__(self, client: Redis, ttl: int = 3600 * 24):
+    def __init__(self, client: Redis, ttl: int):
         self._client = client
         self._ttl = ttl
         self._prefix = 'chat_msg'
@@ -50,10 +50,10 @@ class ChatMessageCache(LogMixin):
         raw_data['type'] = msg_info.type.value
         raw_data['created_at'] = raw_data['created_at'].isoformat()
         raw_data['updated_at'] = raw_data['updated_at'].isoformat()
-
+        raw_data['body_encrypted'] = raw_data['body_encrypted'].decode()
         key = self._key(msg_info.chat_id, msg_date)
         result = await self._client.rpush(key, json.dumps(raw_data))
-        await self._client.expire(key, self._ttl, nx=True)
+        await self._client.expire(key, self._ttl)
         return result
 
     @exception_handler(generate_exc=False)
@@ -84,7 +84,7 @@ class ChatMessageCache(LogMixin):
                     if current.get('forwarded_from_message_id') else None
                 ),
                 forwarded_from_user_id=current.get('forwarded_from_user_id'),
-                body_encrypted=current['body_encrypted'],
+                body_encrypted=current['body_encrypted'].encode(),
                 is_edited=current['is_edited'],
                 created_at=datetime.fromisoformat(current['created_at']),
                 updated_at=datetime.fromisoformat(current['updated_at']),
