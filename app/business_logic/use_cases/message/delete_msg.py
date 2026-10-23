@@ -5,8 +5,12 @@ from app.business_logic.services import ChatService, MessageService
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events.audit import AuditEvent, Context
 from app.domain.events.enums import ActionType
+from app.infrastructure.database.exceptions import RecordNotFound
 from app.infrastructure.websocket import WSBroker
 from app.shared.dto.audit import RequestMeta
+from app.shared.dto.base import UNSET
+from app.shared.dto.chat import ChatUpdateDTO
+from app.shared.dto.enums import ChatRole
 from app.shared.log_config import LogMixin
 
 
@@ -17,16 +21,18 @@ class DeleteMessageUseCase(LogMixin):
     Сценарий:
     - Проверить права (автор или админ).
     - Удалить сообщение.
+    - Если это было последнее сообщение — обновить превью чата.
     - Опубликовать в WebSocket.
     - Записать audit-событие.
+    - Очистить кеш истории.
     """
 
     def __init__(
-        self,
-        message_service: MessageService,
-        chat_service: ChatService,
-        ws_broker: WSBroker,
-        uow: UnitOfWork,
+            self,
+            message_service: MessageService,
+            chat_service: ChatService,
+            ws_broker: WSBroker,
+            uow: UnitOfWork,
     ):
         self._message_service = message_service
         self._chat_service = chat_service
@@ -34,21 +40,31 @@ class DeleteMessageUseCase(LogMixin):
         self._uow = uow
 
     async def execute(
-        self,
-        message_id: UUID,
-        actor_id: str,
-        request_meta: RequestMeta,
+            self,
+            message_id: UUID,
+            actor_id: str,
+            request_meta: RequestMeta,
     ):
         time_now = datetime.now(tz=timezone.utc)
 
         # Получить сообщение
         message = await self._message_service.get(message_id)
+        actor = await self._chat_service.get_member(message.chat_id, actor_id)
+        message_owner = None
 
-        # Проверить права
-        is_author = message.sender_id == actor_id
-        is_admin = await self._chat_service.is_admin(message.chat_id, actor_id)
+        try:
+            if message.sender_id:
+                message_owner = await self._chat_service.get_member(message.chat_id, message.sender_id)
+        except RecordNotFound:
+            pass
 
-        if not is_author and not is_admin:
+        can_manage = False
+        if message_owner:
+            can_manage = actor.role.can_manage(message_owner.role)
+        else:
+            can_manage = actor.role in [ChatRole.ADMIN, ChatRole.OWNER]
+
+        if actor_id != message.sender_id and not can_manage:
             self.log_warning(
                 f"Пользователь {actor_id} пытался удалить сообщение {message_id}"
             )
@@ -57,9 +73,22 @@ class DeleteMessageUseCase(LogMixin):
             )
 
         # Удалить сообщение
-        deleted = await self._message_service.delete(message_id)
+        await self._message_service.delete(message_id)
 
-        # Отправить событие по ws
+        # Обновить превью чата, если удалили последнее сообщение
+        chat = await self._chat_service.get(message.chat_id)
+        if chat.last_message_id == message_id:
+            prev_message = await self._message_service.get_previous_message(
+                chat_id=message.chat_id,
+                before_date=message.created_at
+            )
+
+            await self._chat_service.update(chat.id, ChatUpdateDTO(
+                last_message_id=prev_message.id if prev_message else UNSET,
+                last_message_at=prev_message.created_at if prev_message else UNSET
+            ))
+
+        # Отправить событие удаления по WebSocket
         self._uow.add_after_commit(
             lambda: self._ws_broker.publish_to_chat(
                 action_type="message_deleted",
@@ -68,7 +97,7 @@ class DeleteMessageUseCase(LogMixin):
             )
         )
 
-        # Сохранить событие
+        # Сохранить событие в Audit
         self._uow.add_event(AuditEvent(
             actor_type=ActionType.DELETE_MESSAGE_IN_CHAT,
             actor_id=actor_id,
