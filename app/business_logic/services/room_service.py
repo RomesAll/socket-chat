@@ -23,6 +23,9 @@ class RoomService(LogMixin):
         self._mapper = mapper
         self._cache = cache
 
+    async def get_room_members(self, room_id: UUID):
+        return await self._uow.room_read_repo.get_room_members(room_id)
+
     async def get(self, room_id: UUID) -> RoomDTO:
         """
         Получить информацию о комнате по ID.
@@ -78,7 +81,7 @@ class RoomService(LogMixin):
         room_orm = await self._uow.room_repo.save(room_dto)
         saved_room = self._mapper.to_dto(room_orm)
         self._uow.add_event(RoomCreated(
-            room=saved_room,
+            room=saved_room
         ))
         self.log_info(f"Создана комната {saved_room.chat_id}")
         return saved_room
