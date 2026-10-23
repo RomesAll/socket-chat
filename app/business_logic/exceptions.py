@@ -166,3 +166,12 @@ class ReplyMessageForwardedError(Exception):
     def __init__(self):
         self.msg = 'Сообщение не может содержать ответ и пересылку'
         super().__init__(self.msg)
+
+
+class UserIsNotMember(Exception):
+    """Пользователь не является участников"""
+    def __init__(self, user_id: str, chat_id: UUID):
+        self.user_id = user_id
+        self.chat_id = chat_id
+        self.msg = f'Пользователь {user_id} не является участником чата {chat_id}'
+        super().__init__(self.msg)
