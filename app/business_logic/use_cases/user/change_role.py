@@ -39,32 +39,30 @@ class ChangeUserRoleUseCase(LogMixin):
         new_role: RoleEnum,
         actor_id: str,
         request_meta: RequestMeta,
-        current_refresh_id: UUID | None = None,
     ) -> UserDtoGet:
         time_now = datetime.now(tz=timezone.utc)
-
-        # Проверка прав доступа
-        actor = await self._user_service.get(actor_id)
-        if actor.role not in (RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN):
-            self.log_warning(
-                f"Пользователь {actor_id} пытался сменить роль {user_id}"
-            )
-            raise PermissionError(
-                f"Пользователь {actor_id} не может менять роли"
-            )
 
         # Нельзя изменить свою роль самостоятельно!
         if actor_id == user_id:
             self.log_warning(f"Пользователь {actor_id} пытался сменить свою роль")
             raise PermissionError("Нельзя менять свою роль")
 
-        # Получить состояние объекта до изменения
-        before = await self._user_service.get(user_id)
+        # Проверка роли актора
+        actor = await self._user_service.get(actor_id)
+        target = await self._user_service.get(user_id)
 
-        # Если роль такая же
-        if before.role == new_role:
+        if not actor.role.can_manage(target.role):
+            self.log_warning(f"Пользователь {actor_id} пытался сменить роль {user_id}")
+            raise PermissionError(f"Пользователь {actor_id} не может изменить роль {user_id}")
+
+        if actor.role == RoleEnum.ADMIN and new_role > actor.role:
+            self.log_warning(f"Админ {actor_id} не может создать роль выше своей {user_id}")
+            raise PermissionError(f"Админ {actor_id} не может создать роль выше своей {user_id}")
+
+        # Если роль та же
+        if target.role == new_role:
             self.log_info(f"Роль пользователя {user_id} уже {new_role}")
-            return before
+            return target
 
         # Сменить роль пользователя
         updated = await self._user_service.update_role(user_id, new_role)
@@ -74,7 +72,7 @@ class ChangeUserRoleUseCase(LogMixin):
             actor_type=ActionType.CHANGE_USER_ROLE,
             actor_id=actor_id,
             target_id=user_id,
-            old_data={"role": before.role.value},
+            old_data={"role": target.role.value},
             new_data={"role": new_role.value},
             context=Context(
                 ip=request_meta.ip,
@@ -86,14 +84,7 @@ class ChangeUserRoleUseCase(LogMixin):
 
         self.log_info(
             f"Пользователь {actor_id} сменил роль {user_id}: "
-            f"{before.role.value} → {new_role.value}"
-        )
-
-        # Отозвать все refresh-токены, кроме текущего
-        exclude_id_token = {current_refresh_id, } if current_refresh_id else None
-        await self._token_service.revoke_all(
-            user_id=user_id,
-            exclude_token_ids=exclude_id_token
+            f"{target.role} → {new_role}"
         )
 
         return updated
