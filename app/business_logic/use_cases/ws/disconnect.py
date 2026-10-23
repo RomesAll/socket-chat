@@ -1,9 +1,7 @@
-from datetime import datetime, timezone
 from uuid import UUID
 from app.business_logic.services import ChatService
 from app.infrastructure.redis import PresenceCache, SessionKeyStorage
 from app.infrastructure.websocket import UserConnectionManager, WSBroker
-from app.shared.dto.audit import RequestMeta
 from app.shared.log_config import LogMixin
 
 
@@ -38,16 +36,13 @@ class DisconnectWebSocketUseCase(LogMixin):
         ws,
         user_id: str,
         session_id: UUID,
-        request_meta: RequestMeta,
     ) -> None:
-        time_now = datetime.now(tz=timezone.utc)
-
         # Отписаться от чатов
-        chats = await self._chat_service.get_chats_user(user_id)
-        for chat in chats:
+        chats = await self._chat_service.get_user_chat_ids(user_id)
+        for chat_id in chats:
             await self._ws_broker.publish_leave_chat(
                 action_type="leave_chat",
-                chat_id=chat.id,
+                chat_id=chat_id,
                 user_id=user_id,
             )
 
@@ -59,5 +54,6 @@ class DisconnectWebSocketUseCase(LogMixin):
 
         if not self._manager.is_online(user_id):
             await self._presence.set_offline(user_id)
+            await self._ws_broker.publish_user_status(user_id, False, chats)
 
         self.log_info(f"Пользователь {user_id} отключился (session={session_id})")

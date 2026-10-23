@@ -1,12 +1,7 @@
-from datetime import datetime, timezone
 from uuid import UUID, uuid4
-
 from app.business_logic.services import ChatService, UserService
-from app.domain.events.audit import AuditEvent, Context
-from app.domain.events.enums import ActionType
 from app.infrastructure.redis import PresenceCache, SessionKeyStorage
 from app.infrastructure.websocket import UserConnectionManager, WSBroker
-from app.shared.dto.audit import RequestMeta
 from app.shared.log_config import LogMixin
 
 
@@ -44,10 +39,7 @@ class ConnectWebSocketUseCase(LogMixin):
         ws,
         user_id: str,
         session_key: bytes,
-        request_meta: RequestMeta,
     ) -> UUID:
-        time_now = datetime.now(tz=timezone.utc)
-
         # Проверка пользователя
         await self._user_service.get(user_id)
 
@@ -62,13 +54,15 @@ class ConnectWebSocketUseCase(LogMixin):
         await self._presence.set_online(user_id)
 
         # Подписать на все чаты пользователя
-        chats = await self._chat_service.get_chats_user(user_id)
-        for chat in chats:
+        chats = await self._chat_service.get_user_chat_ids(user_id)
+        for chat_id in chats:
             await self._ws_broker.publish_join_chat(
                 action_type="join_chat",
-                chat_id=chat.id,
+                chat_id=chat_id,
                 user_id=user_id,
             )
+
+        await self._ws_broker.publish_user_status(user_id, True, chats)
 
         self.log_info(f"Пользователь {user_id} подключился (session={session_id})")
         return session_id
