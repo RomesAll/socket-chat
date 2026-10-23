@@ -9,7 +9,8 @@ from .msg_report_service import MessageReportService
 from .chat_report_service import ChatReportService
 from .room_report_service import RoomReportService
 from .user_report_service import UserReportService
-
+from .audit_service import AuditService
+from .presence_service import PresenceService
 
 __version__ = 'v0.3.0'
 __author__ = 'RomesAll'
@@ -24,5 +25,7 @@ __all__ = [
     'MessageReportService',
     'ChatReportService',
     'RoomReportService',
-    'UserReportService'
+    'UserReportService',
+    'AuditService',
+    'PresenceService'
 ]
