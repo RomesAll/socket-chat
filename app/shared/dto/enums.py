@@ -1,43 +1,58 @@
-from enum import Enum
+from enum import IntEnum, Enum
 
 
 class TokenType(str, Enum):
     """Перечисления типов токенов"""
-    ACCESS_TOKEN = 'access_token'
-    REFRESH_TOKEN = 'refresh_token'
+    ACCESS_TOKEN = 'ACCESS_TOKEN'
+    REFRESH_TOKEN = 'REFRESH_TOKEN'
 
 
 class SendType(str, Enum):
     """Причисление с типом отправки кода"""
-    EMAIL = 'email'
+    EMAIL = 'EMAIL'
 
 
 class ChatType(str, Enum):
     """Перечисление типов чатов"""
-    PRIVATE = 'private'
-    ROOM = 'room'
+    PRIVATE = 'PRIVATE'
+    ROOM = 'ROOM'
 
 
-class ChatRole(str, Enum):
+class ChatRole(IntEnum):
     """Перечисление ролей в комнатах"""
-    OWNER = 'owner'
-    ADMIN = 'admin'
-    MEMBER = 'member'
+    MEMBER = 1
+    ADMIN = 2
+    OWNER = 3
+
+    @property
+    def level(self) -> int:
+        return int(self)
+
+    def can_manage(self, other: 'ChatRole'):
+        return self.level > other.level
 
 
-class RoleEnum(str, Enum):
+class RoleEnum(IntEnum):
     """Перечисление списка ролей"""
-    DEFAULT_USER = 'default_user'
-    ADMIN = 'admin'
-    SUPER_ADMIN = 'super_admin'
+    DEFAULT_USER = 1
+    ADMIN = 2
+    SUPER_ADMIN = 3
+
+    @property
+    def level(self) -> int:
+        return int(self)
+
+    def can_manage(self, other: 'RoleEnum'):
+        return self.level > other.level
 
 
 class MessageType(str, Enum):
     """Перечисление типов сообщений"""
-    TEXT = 'text'
-    FILE = 'file'
-    SYSTEM = 'system'
-    TEXT_AND_FILE = 'text_and_file'
+    TEXT = 'TEXT'
+    FILE = 'FILE'
+    SYSTEM = 'SYSTEM'
+    TEXT_AND_FILE = 'TEXT_AND_FILE'
+    FORWARD = 'FORWARD'
 
 
 class MimeType(str, Enum):

@@ -3,6 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from app.shared.dto.base import BaseSaveDTO, BaseUpdateDTO, UNSET, _UnsetType
 from app.shared.dto.enums import ChatRole, ChatType
+from app.shared.dto.message import MessageBriefGetDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,10 +28,30 @@ class ChatDTO:
     id: UUID
     type: ChatType
     is_active: bool
-    last_message_at: datetime | None
-    last_message_id: UUID | None
     created_at: datetime
     updated_at: datetime
+    last_message_at: datetime | None = None
+    last_message_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PrivateChatDTO:
+    id: UUID
+    companion_id: str
+    companion_name: str
+    count_unread: int
+    companion_avatar: str | None = None
+    last_message: 'MessageBriefGetDTO | None' = None
+
+
+@dataclass(frozen=True, slots=True)
+class GroupChatDTO:
+    id: UUID
+    title: str
+    last_message: 'MessageBriefGetDTO | None'
+    count_unread: int
+    role: ChatRole
+    avatar_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +78,6 @@ class ChatMemberDTO:
     user_id: str
     role: ChatRole
     mute: bool
-    last_read_message_id: UUID | None
     created_at: datetime
     updated_at: datetime
+    last_read_message_id: UUID | None = None

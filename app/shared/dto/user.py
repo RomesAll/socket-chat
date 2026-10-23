@@ -32,7 +32,6 @@ class UserEncryptedSaveDTO(BaseUserSaveDTO, BaseSaveDTO):
 class UserUpdateDTO(BaseUpdateDTO):
     """DTO для обновления базовой информации пользователя."""
     display_name: str | None | _UnsetType= UNSET
-    avatar_url: str | None | _UnsetType= UNSET
     description: str | None | _UnsetType= UNSET
     years_old: int | None | _UnsetType= UNSET
 
@@ -42,6 +41,8 @@ class UserDtoBriefGet:
     """DTO для получения общей информации о пользователе."""
     id: str
     display_name: str
+    years_old: int | None
+    description: str | None
     avatar_url: str | None
     created_at: datetime
     updated_at: datetime
@@ -63,6 +64,8 @@ class UserDtoGet(UserDtoBriefGet):
             avatar_url=self.avatar_url,
             created_at=self.created_at,
             updated_at=self.updated_at,
+            years_old=self.years_old,
+            description=self.description
         )
 
 

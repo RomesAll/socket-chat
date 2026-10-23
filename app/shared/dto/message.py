@@ -13,14 +13,6 @@ class ReplyEncryptedMessageDTO:
 
 
 @dataclass(frozen=True, slots=True)
-class ForwardedEncryptedMessageDTO:
-    forwarded_from_message_id: UUID
-    type: MessageType
-    forwarded_from_user_id: str | None
-    body_encrypted: bytes | None
-
-
-@dataclass(frozen=True, slots=True)
 class MessageEncryptedGetDTO:
     id: UUID
     chat_id: UUID
@@ -32,6 +24,27 @@ class MessageEncryptedGetDTO:
     is_edited: bool
     created_at: datetime
     updated_at: datetime
+    files: list[MessageAttachmentGetDTO] | None = None
+
+
+@dataclass(frozen=False, slots=True)
+class ForwardedEncryptedMessageDTO:
+    forwarded_from_message_id: UUID
+    forwarded_from_user_id: str
+    type: MessageType
+    body_encrypted: bytes | None = None
+    files: list[MessageAttachmentGetDTO] | None = None
+    chat_id: UUID | None = None
+
+
+@dataclass(frozen=False, slots=True)
+class ForwardedMessageDTO:
+    forwarded_from_message_id: UUID
+    forwarded_from_user_id: str
+    type: MessageType
+    text: str | None = None
+    files: list[MessageAttachmentGetDTO] | None = None
+    chat_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,15 +54,7 @@ class ReplyMessageDTO:
     text: str | None
 
 
-@dataclass(frozen=True, slots=True)
-class ForwardedMessageDTO:
-    forwarded_from_message_id: UUID
-    forwarded_from_user_id: str | None
-    type: MessageType
-    text: str | None
-
-
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=False, slots=True)
 class MessageGetDTO:
     id: UUID
     chat_id: UUID
@@ -61,10 +66,26 @@ class MessageGetDTO:
     is_edited: bool
     created_at: datetime
     updated_at: datetime
+    files: list[MessageAttachmentGetDTO] | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class SendMessageCommand:
+class MessageBriefGetDTO:
+    type: MessageType
+    text: str | None
+    sender_id: str
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class MessageBriefEncryptedGetDTO:
+    type: MessageType
+    body_encrypted: bytes | None
+    sender_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class SendMessage:
     """Команда отправки сообщения из запроса."""
     chat_id: UUID | None = None
     recipient_id: str | None = None
@@ -130,6 +151,16 @@ class MessageEncryptedReadDTO(BaseMessageDTO):
     is_edited: bool
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class MessageSavedDtoGet:
+    """Получить информацию о сохраненном сообщении"""
+    id: UUID
+    chat_id: UUID
+    sender_id: str | None
+    created_at: datetime
+    file_ids: list[UUID]
 
 
 @dataclass(frozen=True, slots=True)

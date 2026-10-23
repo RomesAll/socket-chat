@@ -88,6 +88,13 @@ class TopChat:
 
 
 @dataclass(frozen=True, slots=True)
+class CountMessagesByDay:
+    """DTO для хранения кол-ва сообщений по дням"""
+    day: date
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
 class CountCreatedRoom:
     """DTO для хранения кол-ва созданных комнат"""
     day: date
