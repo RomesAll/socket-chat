@@ -1,9 +1,8 @@
-from datetime import date
 from uuid import UUID
 from app.business_logic.exceptions import PermissionError
 from app.business_logic.services import ChatService, MessageService
 from app.infrastructure.security import SymmetricEncode
-from app.shared.dto.message import MessageEncryptedReadDTO, MessageGetDTO, MessageEncryptedGetDTO, ReplyMessageDTO, \
+from app.shared.dto.message import MessageGetDTO, MessageEncryptedGetDTO, ReplyMessageDTO, \
     ForwardedMessageDTO
 
 
@@ -30,7 +29,8 @@ class GetChatHistoryUseCase:
     async def execute(
         self,
         chat_id: UUID,
-        date_limit: date,
+        limit: int,
+        before_id: UUID | None,
         actor_id: str,
     ) -> list[MessageGetDTO]:
         # Проверить права
@@ -41,7 +41,11 @@ class GetChatHistoryUseCase:
             )
 
         # Получить зашифрованные сообщения
-        encrypted_messages = await self._message_service.get_message_by_chat(date_limit, chat_id)
+        encrypted_messages = await self._message_service.get_message_by_chat(
+            chat_id=chat_id,
+            limit=limit,
+            before_id=before_id
+        )
 
         return [self._decrypt(msg) for msg in encrypted_messages]
 
@@ -91,4 +95,5 @@ class GetChatHistoryUseCase:
             is_edited=msg.is_edited,
             created_at=msg.created_at,
             updated_at=msg.updated_at,
+            files=msg.files
         )
