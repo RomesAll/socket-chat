@@ -6,6 +6,7 @@ from app.business_logic.services.invite_token_service import InviteTokenService
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events.audit import AuditEvent, Context
 from app.domain.events.enums import ActionType
+from app.infrastructure.websocket import WSBroker
 from app.shared.dto.audit import RequestMeta
 from app.shared.dto.chat import ChatMemberDTO, ChatMemberSaveDTO
 from app.shared.dto.enums import ChatRole
@@ -30,11 +31,13 @@ class JoinByInviteUseCase(LogMixin):
         room_service: RoomService,
         invite_service: InviteTokenService,
         uow: UnitOfWork,
+        ws_broker: WSBroker
     ):
         self._chat_service = chat_service
         self._room_service = room_service
         self._invite_service = invite_service
         self._uow = uow
+        self._ws_broker = ws_broker
 
     async def execute(
         self,
@@ -55,7 +58,7 @@ class JoinByInviteUseCase(LogMixin):
                 f"Пользователь {actor_id} уже в чате {room_id}"
             )
 
-        # Проверить олимит участников
+        # Проверить лимит участников
         room = await self._room_service.get(room_id)
         members = await self._chat_service.get_members(room_id)
         if len(members) >= room.max_users:
@@ -69,6 +72,15 @@ class JoinByInviteUseCase(LogMixin):
             user_id=actor_id,
             role=ChatRole.MEMBER,
         ))
+
+        # Отправить событие по ws
+        self._uow.add_after_commit(
+            lambda: self._ws_broker.publish_join_chat(
+                action_type="join_chat",
+                chat_id=room_id,
+                user_id=actor_id
+            )
+        )
 
         # Сохранить событие
         self._uow.add_event(AuditEvent(
