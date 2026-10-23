@@ -13,7 +13,7 @@ class UserCache(LogMixin):
     Адаптер для кеша информации о пользователях.
     """
 
-    def __init__(self, client: Redis, ttl: int = 3600):
+    def __init__(self, client: Redis, ttl: int):
         self._client = client
         self._ttl = ttl
         self._prefix = 'user_info'
