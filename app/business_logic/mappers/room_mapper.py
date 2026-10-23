@@ -26,5 +26,6 @@ class RoomMapper:
             description=room_orm.description,
             avatar_url=room_orm.avatar_url,
             created_at=room_orm.created_at,
-            updated_at=room_orm.updated_at
+            updated_at=room_orm.updated_at,
+            max_users=room_orm.max_users
         )
