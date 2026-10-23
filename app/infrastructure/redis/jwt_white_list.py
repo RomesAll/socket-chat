@@ -14,7 +14,7 @@ class JWTWhiteListCache:
         self._prefix = 'white_list'
 
     @exception_handler(generate_exc=True)
-    async def save_refresh_token(self, user_id: str, token_id: UUID, ex: int = 10_000) -> bool:
+    async def save_refresh_token(self, user_id: str, token_id: UUID, ex: int) -> bool:
         """Сохранение refresh токена"""
         name = f'{self._prefix}:{user_id}:{token_id}'
         result = bool(await self.client.set(name, 'active', ex=ex))
