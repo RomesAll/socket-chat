@@ -51,7 +51,14 @@ class InviteTokenService(LogMixin):
             raise UrlTokenNotFound(token)
         if doc.is_revoked:
             raise UrlTokenIsRevoked(token)
-        if doc.expires_at < datetime.now(tz=timezone.utc):
+
+        expires_at = doc.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(tz=timezone.utc)
+
+        if expires_at < now:
             raise UrlTokenNotFound(token)
         if doc.max_uses is not None and doc.used_count >= doc.max_uses:
             raise UrlTokenMaxUses(token)
