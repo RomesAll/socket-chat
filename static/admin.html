@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin — Socket Chat</title>
+    <link rel="icon" href="data:,">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5; min-height: 100vh; }
+        :root { --primary: #2b6cb0; --primary-hover: #23548a; --danger: #e41e3f; }
+        .header { background: #fff; border-bottom: 1px solid #e4e6eb; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 20px; }
+        .header-actions { display: flex; gap: 12px; align-items: center; }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: #f0f2f5; color: #333; }
+        .btn-secondary:hover { background: #e4e6eb; }
+        .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #b71c2f; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .tabs { display: flex; gap: 8px; border-bottom: 1px solid #e4e6eb; margin-bottom: 24px; }
+        .tab { padding: 12px 20px; cursor: pointer; font-weight: 600; color: #65676b; border-bottom: 2px solid transparent; transition: 0.2s; }
+        .tab:hover { color: var(--primary); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+        .card h2 { font-size: 18px; margin: 0; }
+        .filters { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; }
+        .filter-group label { font-size: 12px; color: #65676b; font-weight: 500; }
+        .filter-group input, .filter-group select { width: 150px; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+        .filter-group input[type="number"] { width: 80px; }
+        table { width: 100%; border-collapse: collapse; }
+        table th, table td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f2f5; font-size: 14px; }
+        table th { font-weight: 600; color: #65676b; background: #f7f9fb; }
+        table tr:hover { background: #f7f9fb; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-admin { background: #fff3e0; color: #e65100; }
+        .badge-superadmin { background: #fce4ec; color: #c2185b; }
+        .badge-user { background: #e3f2fd; color: #1565c0; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .modal { background: #fff; border-radius: 12px; padding: 24px; width: 420px; max-width: 90vw; }
+        .modal h3 { margin-bottom: 16px; }
+        .modal label { display: block; font-size: 13px; color: #65676b; margin-bottom: 4px; }
+        .modal input, .modal select, .modal textarea { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 12px; background: #f0f2f5; outline: none; font-family: inherit; }
+        .modal textarea { resize: vertical; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+        .stat-card { background: #f7f9fb; border-radius: 8px; padding: 16px; }
+        .stat-card .label { font-size: 13px; color: #65676b; margin-bottom: 4px; }
+        .stat-card .value { font-size: 24px; font-weight: 600; color: var(--primary); }
+        .hidden { display: none !important; }
+        .error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+        .empty { padding: 40px; text-align: center; color: #65676b; }
+        .report-list { display: flex; flex-direction: column; gap: 8px; }
+        .report-item { display: flex; justify-content: space-between; padding: 8px 12px; background: #f7f9fb; border-radius: 8px; font-size: 14px; }
+        .report-item code { color: #65676b; font-size: 12px; }
+        .user-info-row { margin-bottom: 8px; font-size: 14px; }
+        .user-info-row span { color: #65676b; }
+
+        /* ─── АУДИТ ─── */
+        .audit-block {
+            background: #f7f9fb;
+            border: 1px solid #e4e6eb;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .audit-block h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #1a202c;
+        }
+        .audit-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+        .audit-item {
+            background: #f7f9fb;
+            border: 1px solid #e4e6eb;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 13px;
+        }
+        .audit-item .audit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .audit-item .audit-action {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .audit-item .audit-date {
+            color: #65676b;
+            font-size: 12px;
+        }
+        .audit-item .audit-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+        .audit-item .audit-row span { color: #65676b; }
+        .audit-item .audit-row b { color: #1a202c; }
+        .audit-item pre {
+            background: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 8px;
+            border: 1px solid #e4e6eb;
+            max-height: 200px;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-top: 24px;
+            padding: 12px 0;
+            border-top: 1px solid #e4e6eb;
+        }
+        #page-info {
+            font-size: 14px;
+            color: #65676b;
+            font-weight: 600;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        /* ─── ПЕЧАТЬ ─── */
+        .print-only { display: none; }
+        @media print {
+            body { background: #fff; margin: 0; padding: 0; font-size: 12pt; font-family: "Times New Roman", serif; }
+            .header, .tabs, .filters, .btn, .modal-overlay, #tab-users, #tab-audit { display: none !important; }
+            .container { max-width: 100%; padding: 0; margin: 0; }
+            .card { box-shadow: none !important; border: 1px solid #000 !important; border-radius: 0 !important; padding: 15px !important; margin-bottom: 20px !important; page-break-inside: avoid; }
+            .card h2 { font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 15px; }
+            .stat-card { border: 1px solid #ccc; background: none; }
+            .report-item { background: none; border-bottom: 1px dotted #999; padding: 5px 0; }
+            table { border: 1px solid #000; }
+            table th, table td { border: 1px solid #000; padding: 6px; font-size: 11pt; }
+            .print-only { display: block !important; }
+            .print-title-page { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; page-break-after: always; text-align: center; }
+            .print-title-page h1 { font-size: 28pt; margin-bottom: 20px; text-transform: uppercase; }
+            .print-title-page .meta { font-size: 14pt; margin-bottom: 40px; }
+            .print-signature-block { margin-top: 40px; display: flex; justify-content: space-between; page-break-inside: avoid; }
+            .print-signature-line { width: 45%; border-bottom: 1px solid #000; margin-top: 40px; text-align: center; padding-top: 5px; font-size: 12pt; }
+            .print-stamp-area { width: 150px; height: 150px; border: 2px dashed #999; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12pt; margin-top: 20px; float: right; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🛡️ Админ-панель</h1>
+    <div class="header-actions">
+        <span id="current-user" style="font-size: 14px; color: #65676b;"></span>
+        <button class="btn btn-secondary" onclick="location.href='/static/main.html'">К чатам</button>
+        <button class="btn btn-danger" onclick="logout()">Выйти</button>
+    </div>
+</div>
+
+<div class="container">
+    <!-- ТИТУЛЬНЫЙ ЛИСТ (только для печати) -->
+    <div class="print-only print-title-page">
+        <h1>Аналитический отчёт</h1>
+        <div class="meta">
+            <p><strong>Период:</strong> последние <span id="print-days-val">30</span> дней</p>
+            <p><strong>Дата формирования:</strong> <span id="print-date-val"></span></p>
+            <p><strong>Сформировал:</strong> <span id="print-author-val"></span></p>
+        </div>
+    </div>
+
+    <!-- ТАБЫ -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('users', event)">👥 Пользователи</div>
+        <div class="tab" onclick="switchTab('reports', event)">📊 Отчёты</div>
+        <div class="tab hidden" id="tab-audit-btn" onclick="switchTab('audit', event)">📜 Аудит</div>
+    </div>
+
+    <!-- Пользователи -->
+    <div id="tab-users" class="tab-content active">
+        <div class="card">
+            <div class="card-header">
+                <h2>Пользователи</h2>
+                <button class="btn btn-primary" onclick="openCreateUserModal()">+ Создать</button>
+            </div>
+            <div id="users-table-container"><div class="empty">Загрузка...</div></div>
+        </div>
+    </div>
+
+    <!-- Отчёты -->
+    <div id="tab-reports" class="tab-content">
+
+        <!-- Сводка -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Сводка</h2>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Дней</label>
+                        <input type="number" id="report-days-users" value="30" min="1" max="365">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadUsersReport()">Применить</button>
+                    <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Печать</button>
+                </div>
+            </div>
+            <div class="stat-grid">
+                <div class="stat-card"><div class="label">Пользователей</div><div class="value" id="stat-users">—</div></div>
+                <div class="stat-card"><div class="label">Админов</div><div class="value" id="stat-admins">—</div></div>
+                <div class="stat-card"><div class="label">Комнат</div><div class="value" id="stat-rooms">—</div></div>
+                <div class="stat-card"><div class="label">Сообщений</div><div class="value" id="stat-messages">—</div></div>
+            </div>
+        </div>
+
+        <!-- Топ чатов -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Топ чатов</h2>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Лимит</label>
+                        <input type="number" id="limit-top-chats" value="10" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadTopChats()">Применить</button>
+                </div>
+            </div>
+            <div id="top-chats" class="report-list"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- Топ отправителей -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Топ отправителей</h2>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Лимит</label>
+                        <input type="number" id="limit-top-senders" value="10" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadTopSenders()">Применить</button>
+                </div>
+            </div>
+            <div id="top-senders" class="report-list"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- Топ комнат -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Топ комнат</h2>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Лимит</label>
+                        <input type="number" id="limit-top-rooms" value="5" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadTopRooms()">Применить</button>
+                </div>
+            </div>
+            <div id="top-rooms" class="report-list"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- Топ доменов -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Топ доменов email</h2>
+            </div>
+            <div id="top-domains" class="report-list"><div class="empty">Загрузка...</div></div>
+        </div>
+
+        <!-- Подписи (только для печати) -->
+        <div class="print-only" style="margin-top: 50px;">
+            <div class="print-signature-block">
+                <div class="print-signature-line">Подпись ответственного</div>
+                <div class="print-signature-line">Расшифровка подписи</div>
+            </div>
+            <div class="print-stamp-area" style="clear: both;">
+                Место печати
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Аудит -->
+    <div id="tab-audit" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h2>Журнал аудита</h2>
+            </div>
+
+            <!-- БЛОК 1: ПОИСК ПО АКТОРУ -->
+            <div class="audit-block">
+                <h3>1. Действия актора</h3>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>ID Актора</label>
+                        <input type="text" id="q-actor-id" placeholder="Romesky">
+                    </div>
+                    <div class="filter-group">
+                        <label>Лимит</label>
+                        <input type="number" id="q-actor-limit" value="20" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="searchByActor(0)">Найти</button>
+                </div>
+            </div>
+
+            <!-- БЛОК 2: ПОИСК ПО ДЕЙСТВИЮ -->
+            <div class="audit-block">
+                <h3>2. Все действия типа</h3>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Действие</label>
+                        <select id="q-action-val">
+                            <option value="">Выберите действие</option>
+                            <option value="SEND_MESSAGE">SEND_MESSAGE</option>
+                            <option value="DELETE_MESSAGE_IN_CHAT">DELETE_MESSAGE_IN_CHAT</option>
+                            <option value="CHANGE_CHAT_MEMBER_ROLE">CHANGE_CHAT_MEMBER_ROLE</option>
+                            <option value="REMOVE_CHAT_MEMBER">REMOVE_CHAT_MEMBER</option>
+                            <option value="TRANSFER_CHAT_OWNERSHIP">TRANSFER_CHAT_OWNERSHIP</option>
+                            <option value="GENERATE_INVITE_LINK">GENERATE_INVITE_LINK</option>
+                            <option value="REFRESH">REFRESH</option>
+                            <option value="REFRESH_FAILED">REFRESH_FAILED</option>
+                            <option value="NEW_ROOM">NEW_ROOM</option>
+                            <option value="DELETE_USER">DELETE_USER</option>
+                            <option value="CREATE_NEW_USER">CREATE_NEW_USER</option>
+                            <option value="UPDATE_USER">UPDATE_USER</option>
+                            <option value="CHANGE_USER_ROLE">CHANGE_USER_ROLE</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>За N дней</label>
+                        <input type="number" id="q-action-days" value="30" min="1">
+                    </div>
+                    <div class="filter-group">
+                        <label>Лимит</label>
+                        <input type="number" id="q-action-limit" value="20" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="searchByAction(0)">Найти</button>
+                </div>
+            </div>
+
+            <!-- БЛОК 3: ПОИСК ПО АКТОРУ И ОБЪЕКТУ -->
+            <div class="audit-block">
+                <h3>3. Действия актора над объектом</h3>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>ID Актора</label>
+                        <input type="text" id="q-at-actor" placeholder="Romesky">
+                    </div>
+                    <div class="filter-group">
+                        <label>ID Объекта (target)</label>
+                        <input type="text" id="q-at-target" placeholder="ID объекта">
+                    </div>
+                    <div class="filter-group">
+                        <label>За N дней</label>
+                        <input type="number" id="q-at-days" value="30" min="1">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="searchByActorTarget()">Найти</button>
+                </div>
+            </div>
+
+            <!-- РЕЗУЛЬТАТЫ -->
+            <div id="audit-list" class="audit-list">
+                <div class="empty">Выберите способ поиска и нажмите «Найти»</div>
+            </div>
+
+            <!-- ПАГИНАЦИЯ -->
+            <div id="audit-pagination" class="pagination hidden">
+                <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="changePage(-1)">← Назад</button>
+                <span id="page-info">Страница 1</span>
+                <button class="btn btn-secondary btn-sm" id="btn-next" onclick="changePage(1)">Вперед →</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модалки -->
+<div id="create-user-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Создать пользователя</h3>
+        <label>ID</label><input type="text" id="new-user-id" placeholder="alice">
+        <label>Имя</label><input type="text" id="new-user-name" placeholder="Alice">
+        <label>Email</label><input type="email" id="new-user-email" placeholder="alice@example.com">
+        <label>Пароль</label><input type="password" id="new-user-password">
+        <div class="error" id="create-error"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeCreateUserModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="submitCreateUser()">Создать</button>
+        </div>
+    </div>
+</div>
+
+<div id="role-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Сменить роль</h3>
+        <p style="font-size: 13px; color: #65676b; margin-bottom: 12px;">Пользователь: <strong id="role-user-id"></strong></p>
+        <label>Роль</label>
+        <select id="new-role">
+            <option value="DEFAULT_USER">DEFAULT_USER</option>
+            <option value="ADMIN">ADMIN</option>
+            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+        </select>
+        <div class="error" id="role-error"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeRoleModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="submitRoleChange()">Сменить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка просмотра пользователя -->
+<div id="view-user-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Информация о пользователе</h3>
+        <div id="view-user-content" style="font-size: 14px;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeViewUserModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка редактирования пользователя -->
+<div id="edit-user-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Редактировать пользователя</h3>
+        <p style="font-size: 13px; color: #65676b; margin-bottom: 12px;">ID: <strong id="edit-user-id-label"></strong></p>
+        <label>Имя (Display Name)</label><input type="text" id="edit-user-name">
+        <label>Возраст</label><input type="number" id="edit-user-years" min="0" max="150">
+        <label>О себе</label><textarea id="edit-user-desc" rows="3"></textarea>
+        <div class="error" id="edit-user-error"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeEditUserModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="submitEditUser()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка отправки email -->
+<div id="email-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Отправить Email</h3>
+        <p style="font-size: 13px; color: #65676b; margin-bottom: 12px;">Пользователь: <strong id="email-user-id-label"></strong></p>
+        <label>Текст сообщения</label>
+        <textarea id="email-text" rows="5" placeholder="Введите текст письма..."></textarea>
+        <div class="error" id="email-error"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeEmailModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="submitEmail()">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE = 'http://127.0.0.1:8003/api/v1';
+let currentRoleTargetId = null;
+let currentUserName = null;
+let currentUserRole = null;
+let currentAuditRequest = null;
+
+if (!localStorage.getItem('access_token')) {
+    window.location.replace('/static/auth.html');
+}
+
+// ─── ПЕРЕХВАТЧИК ТОКЕНА ────────────────────────────────
+const originalFetch = window.fetch;
+let refreshPromise = null;
+
+window.fetch = async function(...args) {
+    let [resource, config] = args; config = config || {}; config.headers = config.headers || {};
+
+    if (typeof resource === 'string' && !resource.startsWith(API_BASE)) return originalFetch.apply(this, args);
+    if (typeof resource === 'string' && resource.includes('/auth/refresh')) return originalFetch.apply(this, args);
+
+    config.headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`;
+    let response = await originalFetch(resource, config);
+
+    if (response.status === 401) {
+        if (refreshPromise) {
+            try { await refreshPromise; } catch (e) { return response; }
+            config.headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`;
+            return originalFetch(resource, config);
+        }
+
+        refreshPromise = (async () => {
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (!refreshToken) throw new Error('No refresh token');
+
+            const refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${refreshToken}` }
+            });
+
+            if (!refreshRes.ok) throw new Error('Refresh failed');
+
+            const data = await refreshRes.json();
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+        })();
+
+        try {
+            await refreshPromise;
+            config.headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`;
+            return originalFetch(resource, config);
+        } catch (err) {
+            localStorage.clear();
+            window.location.replace('/static/auth.html');
+            return response;
+        } finally {
+            refreshPromise = null;
+        }
+    }
+
+    return response;
+};
+
+function normalizeRole(role) {
+    if (role === null || role === undefined) return null;
+    const s = String(role).trim().toUpperCase();
+    if (s === '1') return 'DEFAULT_USER';
+    if (s === '2') return 'ADMIN';
+    if (s === '3') return 'SUPER_ADMIN';
+    if (s === 'SUPERADMIN') return 'SUPER_ADMIN';
+    return s;
+}
+
+async function checkAccess() {
+    try {
+        const res = await fetch(`${API_BASE}/users/me/profile`);
+        if (!res.ok) {
+            localStorage.clear();
+            window.location.replace('/static/auth.html');
+            return;
+        }
+
+        const user = await res.json();
+        const roleStr = normalizeRole(user.role);
+        currentUserName = user.display_name || user.id;
+        currentUserRole = roleStr;
+
+        document.getElementById('current-user').textContent = `${user.display_name} (${roleStr})`;
+
+        if (roleStr !== 'ADMIN' && roleStr !== 'SUPER_ADMIN') {
+            localStorage.clear();
+            alert(`Доступ только для администраторов. Ваша роль: ${roleStr}`);
+            window.location.replace('/static/auth.html');
+            return;
+        }
+
+        if (roleStr === 'SUPER_ADMIN') {
+            document.getElementById('tab-audit-btn').classList.remove('hidden');
+        }
+
+        loadUsers();
+    } catch (e) {
+        localStorage.clear();
+        window.location.replace('/static/auth.html');
+    }
+}
+
+function switchTab(name, ev) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    if (ev && ev.target) ev.target.classList.add('active');
+    document.getElementById(`tab-${name}`).classList.add('active');
+    if (name === 'reports') {
+        loadUsersReport();
+        loadTopChats();
+        loadTopSenders();
+        loadTopRooms();
+    }
+}
+
+// ─── ПОЛЬЗОВАТЕЛИ ──────────────────────────────────────
+async function loadUsers() {
+    const container = document.getElementById('users-table-container');
+    container.innerHTML = '<div class="empty">Загрузка...</div>';
+    try {
+        const res = await fetch(`${API_BASE}/users/?limit=100&offset=0`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const users = await res.json();
+        if (!users.length) { container.innerHTML = '<div class="empty">Нет пользователей</div>'; return; }
+        container.innerHTML = `
+            <table>
+                <thead><tr><th>ID</th><th>Имя</th><th>Роль</th><th>Действия</th></tr></thead>
+                <tbody>
+                    ${users.map(u => {
+                        const norm = normalizeRole(u.role);
+                        const badgeClass = norm === 'SUPER_ADMIN' ? 'superadmin' : (norm === 'ADMIN' ? 'admin' : 'user');
+                        const showRoleBtn = currentUserRole === 'SUPER_ADMIN' && u.id !== currentUserName;
+                        return `<tr>
+                            <td>${u.id}</td><td>${u.display_name || '—'}</td>
+                            <td><span class="badge badge-${badgeClass}">${norm}</span></td>
+                            <td style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <button class="btn btn-secondary btn-sm" onclick="openViewUser('${u.id}')" title="Просмотр">👁️</button>
+                                <button class="btn btn-secondary btn-sm" onclick="openEditUser('${u.id}')" title="Редактировать">✏️</button>
+                                <button class="btn btn-secondary btn-sm" onclick="openEmailModal('${u.id}')" title="Отправить Email">✉️</button>
+                                ${showRoleBtn ? `<button class="btn btn-secondary btn-sm" onclick="openRoleModal('${u.id}', '${norm}')">Роль</button>` : ''}
+                                <button class="btn btn-secondary btn-sm" onclick="revokeUserTokens('${u.id}')" title="Отозвать все токены (разлогинить)">🚪</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Удалить</button>
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+    } catch (e) { container.innerHTML = `<div class="empty">Ошибка: ${e.message}</div>`; }
+}
+
+function openCreateUserModal() { document.getElementById('create-user-modal').classList.remove('hidden'); }
+function closeCreateUserModal() { document.getElementById('create-user-modal').classList.add('hidden'); }
+
+async function submitCreateUser() {
+    const id = document.getElementById('new-user-id').value.trim();
+    const name = document.getElementById('new-user-name').value.trim();
+    const email = document.getElementById('new-user-email').value.trim();
+    const password = document.getElementById('new-user-password').value;
+    const err = document.getElementById('create-error');
+    err.textContent = '';
+    try {
+        const res = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: id, display_name: name, email, password })
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Ошибка');
+        closeCreateUserModal();
+        loadUsers();
+    } catch (e) { err.textContent = e.message; }
+}
+
+function openRoleModal(id, role) {
+    currentRoleTargetId = id;
+    document.getElementById('role-user-id').textContent = id;
+    document.getElementById('new-role').value = role || 'DEFAULT_USER';
+    document.getElementById('role-error').textContent = '';
+    document.getElementById('role-modal').classList.remove('hidden');
+}
+function closeRoleModal() { document.getElementById('role-modal').classList.add('hidden'); }
+
+async function submitRoleChange() {
+    const newRole = document.getElementById('new-role').value;
+    const err = document.getElementById('role-error');
+    err.textContent = '';
+    try {
+        const res = await fetch(`${API_BASE}/users/${encodeURIComponent(currentRoleTargetId)}/role?new_role=${newRole}`, {
+            method: 'PATCH'
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Ошибка');
+        closeRoleModal();
+        loadUsers();
+    } catch (e) { err.textContent = e.message; }
+}
+
+async function deleteUser(id) {
+    if (!confirm(`Удалить ${id}?`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Ошибка');
+        loadUsers();
+    } catch (e) { alert(e.message); }
+}
+
+// ─── ПРОСМОТР И РЕДАКТИРОВАНИЕ ─────────────────────────
+async function openViewUser(id) {
+    document.getElementById('view-user-modal').classList.remove('hidden');
+    const content = document.getElementById('view-user-content');
+    content.innerHTML = 'Загрузка...';
+    try {
+        const res = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}/profile`);
+        if (!res.ok) throw new Error(await parseError(res));
+        const data = await res.json();
+        content.innerHTML = `
+            <div class="user-info-row"><span>ID:</span> <b>${data.id}</b></div>
+            <div class="user-info-row"><span>Имя:</span> <b>${data.display_name}</b></div>
+            <div class="user-info-row"><span>Email:</span> <b>${data.email || '—'}</b></div>
+            <div class="user-info-row"><span>Роль:</span> <b>${normalizeRole(data.role)}</b></div>
+            <div class="user-info-row"><span>Возраст:</span> <b>${data.years_old || '—'}</b></div>
+            <div class="user-info-row"><span>Описание:</span> <b>${data.description || '—'}</b></div>
+            <div class="user-info-row"><span>Создан:</span> <b>${data.created_at ? new Date(data.created_at).toLocaleString('ru-RU') : '—'}</b></div>
+        `;
+    } catch (e) {
+        content.innerHTML = `<div class="error">Ошибка: ${e.message}</div>`;
+    }
+}
+function closeViewUserModal() { document.getElementById('view-user-modal').classList.add('hidden'); }
+
+async function openEditUser(id) {
+    document.getElementById('edit-user-modal').classList.remove('hidden');
+    document.getElementById('edit-user-id-label').textContent = id;
+    document.getElementById('edit-user-error').textContent = '';
+    document.getElementById('edit-user-id-label').dataset.id = id;
+
+    try {
+        const res = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}/profile`);
+        if (!res.ok) throw new Error(await parseError(res));
+        const data = await res.json();
+        document.getElementById('edit-user-name').value = data.display_name || '';
+        document.getElementById('edit-user-years').value = data.years_old || '';
+        document.getElementById('edit-user-desc').value = data.description || '';
+    } catch (e) {
+        document.getElementById('edit-user-error').textContent = 'Ошибка загрузки: ' + e.message;
+    }
+}
+function closeEditUserModal() { document.getElementById('edit-user-modal').classList.add('hidden'); }
+
+async function submitEditUser() {
+    const id = document.getElementById('edit-user-id-label').dataset.id;
+    const err = document.getElementById('edit-user-error');
+    err.textContent = '';
+
+    const payload = {
+        display_name: document.getElementById('edit-user-name').value.trim(),
+        years_old: parseInt(document.getElementById('edit-user-years').value) || null,
+        description: document.getElementById('edit-user-desc').value.trim() || null,
+    };
+
+    if (!payload.display_name) {
+        err.textContent = 'Имя не может быть пустым';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(await parseError(res));
+        closeEditUserModal();
+        loadUsers();
+    } catch (e) { err.textContent = e.message; }
+}
+
+// ─── ОТПРАВКА EMAIL ────────────────────────────────────
+function openEmailModal(id) {
+    document.getElementById('email-modal').classList.remove('hidden');
+    document.getElementById('email-user-id-label').textContent = id;
+    document.getElementById('email-user-id-label').dataset.id = id;
+    document.getElementById('email-text').value = '';
+    document.getElementById('email-error').textContent = '';
+}
+function closeEmailModal() { document.getElementById('email-modal').classList.add('hidden'); }
+
+async function submitEmail() {
+    const id = document.getElementById('email-user-id-label').dataset.id;
+    const text = document.getElementById('email-text').value.trim();
+    const err = document.getElementById('email-error');
+    err.textContent = '';
+
+    if (!text) {
+        err.textContent = 'Введите текст сообщения';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/messages/${encodeURIComponent(id)}/email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text })
+        });
+        if (!res.ok) throw new Error(await parseError(res));
+        closeEmailModal();
+        alert('Email отправлен!');
+    } catch (e) { err.textContent = e.message; }
+}
+
+// ─── УПРАВЛЕНИЕ ТОКЕНАМИ ───────────────────────────────
+async function revokeUserTokens(userId) {
+    if (!confirm(`Принудительно разлогинить пользователя ${userId} на всех устройствах?`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/tokens/${encodeURIComponent(userId)}/all`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Ошибка отзыва токенов');
+        alert(`Все сессии пользователя ${userId} завершены.`);
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
+// ─── ОТЧЁТЫ ────────────────────────────────────────────
+async function loadUsersReport() {
+    const days = parseInt(document.getElementById('report-days-users').value) || 30;
+    document.getElementById('print-days-val').textContent = days;
+    document.getElementById('print-date-val').textContent = new Date().toLocaleString('ru-RU');
+    document.getElementById('print-author-val').textContent = currentUserName || 'Администратор';
+
+    try {
+        const res = await fetch(`${API_BASE}/reports/users?days=${days}`);
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById('stat-users').textContent = data.count_users || 0;
+            document.getElementById('stat-admins').textContent = data.count_admin || 0;
+
+            const domains = data.top_domain_email || {};
+            document.getElementById('top-domains').innerHTML = Object.keys(domains).length
+                ? Object.entries(domains).map(([d, c]) => `<div class="report-item"><strong>${d}</strong> <span>${c} польз.</span></div>`).join('')
+                : '<div class="empty">Нет данных</div>';
+        }
+    } catch (e) { console.error('users report:', e); }
+
+    try {
+        const res = await fetch(`${API_BASE}/reports/rooms?days=${days}`);
+        if (res.ok) {
+            const data = await res.json();
+            const created = data.created_room || [];
+            const total = Array.isArray(created) ? created.reduce((sum, item) => sum + (item.count || 0), 0) : 0;
+            document.getElementById('stat-rooms').textContent = total;
+        }
+    } catch (e) { console.error('rooms count:', e); }
+
+    try {
+        const res = await fetch(`${API_BASE}/reports/messages/count-send?days=${days}`);
+        if (res.ok) {
+            const data = await res.json();
+            const total = Array.isArray(data) ? data.reduce((sum, item) => sum + (item.count || 0), 0) : 0;
+            document.getElementById('stat-messages').textContent = total;
+        }
+    } catch (e) { console.error('messages count:', e); }
+}
+
+async function loadTopChats() {
+    const limit = parseInt(document.getElementById('limit-top-chats').value) || 10;
+    const container = document.getElementById('top-chats');
+    container.innerHTML = '<div class="empty">Загрузка...</div>';
+    try {
+        const res = await fetch(`${API_BASE}/reports/messages/top-chats?limit=${limit}`);
+        if (res.ok) {
+            const data = await res.json();
+            container.innerHTML = data.length
+                ? data.map(item => `<div class="report-item"><code>${item.chat_id}</code> <span>${item.count} сообщ.</span></div>`).join('')
+                : '<div class="empty">Нет данных</div>';
+        }
+    } catch (e) { container.innerHTML = `<div class="empty">Ошибка: ${e.message}</div>`; }
+}
+
+async function loadTopSenders() {
+    const limit = parseInt(document.getElementById('limit-top-senders').value) || 10;
+    const container = document.getElementById('top-senders');
+    container.innerHTML = '<div class="empty">Загрузка...</div>';
+    try {
+        const res = await fetch(`${API_BASE}/reports/messages/top-senders?limit=${limit}`);
+        if (res.ok) {
+            const data = await res.json();
+            container.innerHTML = data.length
+                ? data.map(item => `<div class="report-item"><strong>${item.user_id}</strong> <span>${item.count} сообщ.</span></div>`).join('')
+                : '<div class="empty">Нет данных</div>';
+        }
+    } catch (e) { container.innerHTML = `<div class="empty">Ошибка: ${e.message}</div>`; }
+}
+
+async function loadTopRooms() {
+    const limit = parseInt(document.getElementById('limit-top-rooms').value) || 5;
+    const container = document.getElementById('top-rooms');
+    container.innerHTML = '<div class="empty">Загрузка...</div>';
+    try {
+        const res = await fetch(`${API_BASE}/reports/rooms/top-rooms?top_count=${limit}`);
+        if (res.ok) {
+            const data = await res.json();
+            container.innerHTML = data.length
+                ? data.map(item => `<div class="report-item"><code>${item.chat_id}</code> <span>${item.members_count} участн.</span></div>`).join('')
+                : '<div class="empty">Нет данных</div>';
+        }
+    } catch (e) { container.innerHTML = `<div class="empty">Ошибка: ${e.message}</div>`; }
+}
+
+// ─── АУДИТ ─────────────────────────────────────────────
+
+async function searchByActor(offset = 0) {
+    const actorId = document.getElementById('q-actor-id').value.trim();
+    const limit = parseInt(document.getElementById('q-actor-limit').value) || 20;
+    if (!actorId) { alert('Введите ID актора'); return; }
+
+    currentAuditRequest = { type: 'actor', actorId, limit };
+    const url = `${API_BASE}/audit/actor/${encodeURIComponent(actorId)}?limit=${limit}&offset=${offset}`;
+    await fetchAndRenderAudit(url, offset, limit);
+}
+
+async function searchByAction(offset = 0) {
+    const action = document.getElementById('q-action-val').value;
+    const days = parseInt(document.getElementById('q-action-days').value) || 30;
+    const limit = parseInt(document.getElementById('q-action-limit').value) || 20;
+    if (!action) { alert('Выберите действие'); return; }
+
+    currentAuditRequest = { type: 'action', action, days, limit };
+    const url = `${API_BASE}/audit/action/${action}?days=${days}&limit=${limit}&offset=${offset}`;
+    await fetchAndRenderAudit(url, offset, limit);
+}
+
+async function searchByActorTarget() {
+    const actorId = document.getElementById('q-at-actor').value.trim();
+    const target = document.getElementById('q-at-target').value.trim();
+    const days = parseInt(document.getElementById('q-at-days').value) || 30;
+    if (!actorId) { alert('Введите ID актора'); return; }
+    if (!target) { alert('Введите ID объекта'); return; }
+
+    currentAuditRequest = { type: 'actorTarget', actorId, target, days, limit: 1000 };
+    const url = `${API_BASE}/audit/actor-target?actor_id=${encodeURIComponent(actorId)}&target=${encodeURIComponent(target)}&days=${days}`;
+    document.getElementById('audit-pagination').classList.add('hidden');
+    await fetchAndRenderAudit(url, 0, 1000, false);
+}
+
+async function fetchAndRenderAudit(url, offset, limit, showPagination = true) {
+    const container = document.getElementById('audit-list');
+    container.innerHTML = '<div class="empty">Загрузка...</div>';
+    const paginationEl = document.getElementById('audit-pagination');
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(await parseError(res));
+        const events = await res.json();
+
+        if (!events || events.length === 0) {
+            container.innerHTML = '<div class="empty">Событий не найдено</div>';
+            if (offset === 0) paginationEl.classList.add('hidden');
+            return;
+        }
+
+        container.innerHTML = events.map(e => {
+            const date = e.occurred_at ? new Date(e.occurred_at).toLocaleString('ru-RU') : '—';
+            const actionType = e.actor_type || e.action || '—';
+            const actor = e.actor_id || '—';
+            const target = e.target_id || '—';
+
+            let ip = '—';
+            let ua = '—';
+            if (e.context) {
+                if (typeof e.context === 'object') {
+                    ip = e.context.ip || '—';
+                    ua = e.context.user_agent || '—';
+                } else {
+                    ip = String(e.context);
+                }
+            }
+
+            let dataBlock = '';
+            if (e.old_data || e.new_data) {
+                const payload = { old_data: e.old_data || null, new_data: e.new_data || null };
+                dataBlock = `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+            }
+
+            return `
+                <div class="audit-item">
+                    <div class="audit-header">
+                        <span class="audit-action">${actionType}</span>
+                        <span class="audit-date">${date}</span>
+                    </div>
+                    <div class="audit-row">
+                        <span>ID события: <b>${e._id || '—'}</b></span>
+                    </div>
+                    <div class="audit-row">
+                        <span>Actor: <b>${actor}</b></span>
+                        <span>Target: <b>${target}</b></span>
+                    </div>
+                    <div class="audit-row">
+                        <span>IP: <b>${ip}</b></span>
+                        <span>User-Agent: <b>${ua}</b></span>
+                    </div>
+                    ${dataBlock}
+                </div>
+            `;
+        }).join('');
+
+        if (showPagination) {
+            paginationEl.classList.remove('hidden');
+            const pageNum = Math.floor(offset / limit) + 1;
+            document.getElementById('page-info').textContent = `Страница ${pageNum}`;
+
+            document.getElementById('btn-prev').disabled = offset === 0;
+            document.getElementById('btn-next').disabled = events.length < limit;
+        } else {
+            paginationEl.classList.add('hidden');
+        }
+
+    } catch (err) {
+        container.innerHTML = `<div class="empty" style="color: #e41e3f">Ошибка: ${err.message}</div>`;
+        paginationEl.classList.add('hidden');
+    }
+}
+
+function changePage(direction) {
+    if (!currentAuditRequest) return;
+
+    const pageText = document.getElementById('page-info').textContent;
+    const currentPage = parseInt(pageText.replace(/\D/g, '')) || 1;
+    const newOffset = (currentPage - 1 + direction) * currentAuditRequest.limit;
+
+    if (newOffset < 0) return;
+
+    if (currentAuditRequest.type === 'actor') {
+        searchByActor(newOffset);
+    } else if (currentAuditRequest.type === 'action') {
+        searchByAction(newOffset);
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+async function parseError(res) {
+    try {
+        const d = await res.json();
+        return Array.isArray(d.detail) ? d.detail.map(e => e.msg).join(', ') : (d.detail || d.message || JSON.stringify(d));
+    } catch { return `HTTP ${res.status}`; }
+}
+
+function logout() {
+    localStorage.clear();
+    window.location.replace('/static/auth.html');
+}
+
+checkAccess();
+</script>
+</body>
+</html>
