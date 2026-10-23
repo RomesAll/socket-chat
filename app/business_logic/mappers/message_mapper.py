@@ -25,36 +25,68 @@ class MessageMapper:
         )
 
     @staticmethod
-    def to_read_dtos_with_rel(orm_messages: list[Message]) -> list[MessageEncryptedGetDTO]:
-        dto_messages = []
-        for orm in orm_messages:
-            reply_to, forwarded_from = None, None
-            if orm.reply_to:
-                reply_to = ReplyEncryptedMessageDTO(
-                    id=orm.reply_to.id,
-                    type=orm.reply_to.type,
-                    body_encrypted=orm.reply_to.body_encrypted
-                )
-            if orm.forwarded_from:
-                forwarded_from = ForwardedEncryptedMessageDTO(
-                    forwarded_from_message_id=orm.forwarded_from.id,
-                    type=orm.forwarded_from.type,
-                    body_encrypted=orm.forwarded_from.body_encrypted,
-                    forwarded_from_user_id=orm.forwarded_from.forwarded_from_user_id
-                )
-            dto_messages.append(MessageEncryptedGetDTO(
-                id=orm.id,
-                chat_id=orm.chat_id,
-                sender_id=orm.sender_id,
-                type=orm.type,
-                body_encrypted=orm.body_encrypted,
-                is_edited=orm.is_edited,
-                created_at=orm.created_at,
-                updated_at=orm.updated_at,
-                reply_to=reply_to,
-                forwarded_from=forwarded_from
-            ))
-        return dto_messages
+    def to_read_dtos_with_rel(orm_message: Message) -> MessageEncryptedGetDTO:
+        reply_to, forwarded_from, files = None, None, []
+
+        if orm_message.reply_to:
+            reply_to = ReplyEncryptedMessageDTO(
+                id=orm_message.reply_to.id,
+                type=orm_message.reply_to.type,
+                body_encrypted=orm_message.reply_to.body_encrypted
+            )
+
+        if orm_message.forwarded_from:
+            fwd_files = []
+            # Подгружаем файлы из оригинала
+            fwd_orm_files = getattr(orm_message.forwarded_from, 'files', [])
+            if fwd_orm_files:
+                for file in fwd_orm_files:
+                    fwd_files.append(MessageAttachmentGetDTO(
+                        id=file.id,
+                        message_id=file.message_id,
+                        file_name=file.file_name,
+                        file_path=file.file_path,
+                        mime_type=file.mime_type,
+                        size=file.size,
+                        created_at=file.created_at,
+                        updated_at=file.updated_at
+                    ))
+
+            forwarded_from = ForwardedEncryptedMessageDTO(
+                forwarded_from_message_id=orm_message.forwarded_from.id,
+                type=orm_message.forwarded_from.type,
+                body_encrypted=orm_message.forwarded_from.body_encrypted,
+                forwarded_from_user_id=orm_message.forwarded_from_user_id,
+                files=fwd_files,
+                chat_id=orm_message.forwarded_from.chat_id
+            )
+
+        if orm_message.files:
+            for file in orm_message.files:
+                files.append(MessageAttachmentGetDTO(
+                    id=file.id,
+                    message_id=file.message_id,
+                    file_name=file.file_name,
+                    file_path=file.file_path,
+                    mime_type=file.mime_type,
+                    size=file.size,
+                    created_at=file.created_at,
+                    updated_at=file.updated_at
+                ))
+
+        return MessageEncryptedGetDTO(
+            id=orm_message.id,
+            chat_id=orm_message.chat_id,
+            sender_id=orm_message.sender_id,
+            type=orm_message.type,
+            body_encrypted=orm_message.body_encrypted,
+            is_edited=orm_message.is_edited,
+            created_at=orm_message.created_at,
+            updated_at=orm_message.updated_at,
+            reply_to=reply_to,
+            forwarded_from=forwarded_from,
+            files=files
+        )
 
     @staticmethod
     def attachment_to_dto(attachment_orm: MessageAttachment) -> MessageAttachmentGetDTO:
