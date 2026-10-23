@@ -46,16 +46,15 @@ class DeleteUserUseCase(LogMixin):
 
         # Проверка прав для удаления
         actor = await self._user_service.get(actor_id)
-        if actor.role == RoleEnum.DEFAULT_USER and actor.id != user_id:
-            self.log_warning(
-                f"Пользователь {actor_id} пытался удалить {user_id}"
-            )
-            raise PermissionError(
-                f"Пользователь {actor_id} не может удалить {user_id}"
-            )
+        target = await self._user_service.get(user_id)
 
-        # Получить состояние до удаления
-        before = await self._user_service.get(user_id)
+        if actor_id == user_id:
+            self.log_warning(f"Пользователь {actor_id} пытался удалить сам себя")
+            raise PermissionError("Нельзя удалить самого себя")
+
+        if not actor.role.can_manage(target.role):
+            self.log_warning(f"Пользователь {actor_id} пытался удалить {user_id}")
+            raise PermissionError(f"Пользователь {actor_id} не может удалить {user_id}")
 
         # Получить комнаты, где удаленный пользователь является владельцем
         room_ids, members_by_room = await self._room_service.get_owner_rooms_with_members(user_id)
@@ -76,7 +75,7 @@ class DeleteUserUseCase(LogMixin):
                 to_user=new_owner,
             )
 
-        # Удаление пользователяя
+        # Удаление пользователя
         deleted = await self._user_service.delete(user_id)
 
         # Сохранение события в audit
@@ -84,7 +83,7 @@ class DeleteUserUseCase(LogMixin):
             actor_type=ActionType.DELETE_USER,
             actor_id=actor_id,
             target_id=user_id,
-            old_data=asdict(before),
+            old_data=asdict(target),
             new_data=None,
             context=Context(
                 ip=request_meta.ip,
