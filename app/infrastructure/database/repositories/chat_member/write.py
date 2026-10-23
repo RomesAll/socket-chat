@@ -33,6 +33,7 @@ class ChatMemberRepository(
         member = await self.get_by_ids(chat_id, user_id)
         member.role = role
         await self.session.flush()
+        await self.session.refresh(member)
         return member
 
     async def set_mute(self, chat_id: UUID, user_id: str, mute: bool) -> ChatMember:
@@ -49,6 +50,7 @@ class ChatMemberRepository(
         member = await self.get_by_ids(chat_id, user_id)
         member.last_read_message_id = message_id
         await self.session.flush()
+        await self.session.refresh(member)
         return member
 
     async def remove(self, chat_id: UUID, user_id: str) -> ChatMember:
