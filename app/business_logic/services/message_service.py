@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 from app.business_logic.mappers.message_mapper import MessageMapper
 from app.business_logic.unit_of_work import UnitOfWork
@@ -23,10 +23,30 @@ class MessageService(LogMixin):
         self._mapper = mapper
         self._cache = cache
 
-    async def get_message_by_chat(self, date_limit: date, chat_id: UUID) -> list[MessageEncryptedGetDTO]:
+    async def get_previous_message(
+            self, chat_id: UUID, before_date: datetime
+    ) -> MessageEncryptedReadDTO | None:
+        """Получить предыдущее сообщение в чате до указанной даты."""
+        message_orm = await self._uow.msg_repo.get_previous_message(chat_id, before_date)
+
+        if not message_orm:
+            return None
+
+        return self._mapper.to_read_dto(message_orm)
+
+    async def get_with_rel(self, message_id: UUID) -> MessageEncryptedGetDTO:
+        """Получить сообщение со всеми связями (файлы, reply_to, forward)."""
+        orm_message = await self._uow.msg_repo.get_msg_by_id(message_id)
+        return self._mapper.to_read_dtos_with_rel(orm_message)
+
+    async def get_message_by_chat(self, chat_id: UUID, limit: int, before_id: UUID | None = None) -> list[MessageEncryptedGetDTO]:
         """Получить сообщения в чате"""
-        orm_messages = await self._uow.msg_repo.get_message_by_chat_with_rel(date_limit, chat_id)
-        dto_messages = self._mapper.to_read_dtos_with_rel(orm_messages)
+        orm_messages = await self._uow.msg_repo.get_message_by_chat_with_rel(
+            chat_id=chat_id,
+            limit=limit,
+            before_id=before_id
+        )
+        dto_messages = [self._mapper.to_read_dtos_with_rel(orm) for orm in orm_messages]
         return dto_messages
 
     async def get(self, message_id: UUID) -> MessageEncryptedReadDTO:
@@ -71,7 +91,7 @@ class MessageService(LogMixin):
         """
         return await self._uow.msg_repo.get_message_by_sender(date_limit, sender_id)
 
-    async def save(self, message_dto: MessageEncryptedSavedDTO) -> MessageEncryptedReadDTO:
+    async def save(self, message_dto: MessageEncryptedSavedDTO) -> MessageEncryptedGetDTO:
         """
         Сохранить новое сообщение.
 
@@ -83,15 +103,12 @@ class MessageService(LogMixin):
         :param message_dto: DTO с открытым текстом.
         :return: DTO с расшифрованным текстом.
         """
-        message_orm = await self._uow.msg_repo.save(message_dto)
-        saved_message = self._mapper.to_read_dto(message_orm)
-        self._uow.add_event(MessageSent(
-            message=saved_message
-        ))
-        self.log_info(
-            f"Создано сообщение {saved_message.id} в чате {saved_message.chat_id}"
-        )
-        return saved_message
+        await self._uow.msg_repo.save(message_dto)
+        message_orm = await self._uow.msg_repo.get_msg_by_id(message_dto.id)
+        dto_message = self._mapper.to_read_dtos_with_rel(message_orm)
+        self._uow.add_event(MessageSent(message=dto_message))
+        self.log_info(f"Создано сообщение {dto_message.id} в чате {dto_message.chat_id}")
+        return dto_message
 
     async def update_body(self, message_id: UUID, new_encr_msg: bytes) -> MessageEncryptedReadDTO:
         """
