@@ -74,3 +74,16 @@ class ChatMemberReadRepository:
             .limit(1)
         )
         return await self.session.scalar(stmt) is not None
+
+    async def is_owner(self, chat_id: UUID, user_id: str) -> bool:
+        """Является ли пользователь owner или admin."""
+        stmt = (
+            select(ChatMember.user_id)
+            .where(
+                ChatMember.chat_id == chat_id,
+                ChatMember.user_id == user_id,
+                ChatMember.role.in_([ChatRole.OWNER,]),
+            )
+            .limit(1)
+        )
+        return await self.session.scalar(stmt) is not None
