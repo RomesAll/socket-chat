@@ -41,10 +41,10 @@ class GenerateInviteLinkUseCase(LogMixin):
         time_now = datetime.now(tz=timezone.utc)
 
         # Проверка прав доступа
-        is_admin = await self._chat_service.is_admin(room_id, actor_id)
-        if not is_admin:
+        is_owner = await self._chat_service.is_owner(room_id, actor_id)
+        if not is_owner:
             raise PermissionError(
-                f"Пользователь {actor_id} не админ комнаты {room_id}"
+                f"Пользователь {actor_id} не владелец комнаты {room_id}"
             )
 
         # Генерация и сохранения url токена
