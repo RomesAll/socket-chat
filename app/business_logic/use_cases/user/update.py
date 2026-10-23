@@ -5,7 +5,6 @@ from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events.audit import AuditEvent, Context
 from app.domain.events.enums import ActionType
 from app.shared.dto.audit import RequestMeta
-from app.shared.dto.enums import RoleEnum
 from app.shared.dto.user import UserUpdateDTO, UserDtoGet
 from app.shared.log_config import LogMixin
 from app.business_logic.exceptions import PermissionError
@@ -41,16 +40,11 @@ class UpdateUserUseCase(LogMixin):
 
         # Проверка прав для обновления
         actor = await self._user_service.get(actor_id)
-        if actor.role == RoleEnum.DEFAULT_USER and actor.id != user_id:
-            self.log_warning(
-                f"Пользователь {actor_id} пытался обновить {user_id}"
-            )
-            raise PermissionError(
-                f"Пользователь {actor_id} не может обновить {user_id}"
-            )
+        target = await self._user_service.get(user_id)
 
-        # Получить состояние до обновления
-        before_update = await self._user_service.get(user_id)
+        if actor_id != user_id and not actor.role.can_manage(target.role):
+            self.log_warning(f"Пользователь {actor_id} пытался обновить {user_id}")
+            raise PermissionError(f"Пользователь {actor_id} не может обновить {user_id}")
 
         # Обновить пользователя
         updated = await self._user_service.update(user_id, dto)
@@ -60,7 +54,7 @@ class UpdateUserUseCase(LogMixin):
             actor_type=ActionType.UPDATE_USER,
             actor_id=actor_id,
             target_id=user_id,
-            old_data=asdict(before_update),
+            old_data=asdict(target),
             new_data=asdict(updated),
             context=Context(
                 ip=request_meta.ip,
