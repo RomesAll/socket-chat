@@ -42,6 +42,26 @@ class UserConnectionManager:
         except Exception:
             pass
 
+    async def send_user_status(self, payload: dict):
+        target_id = payload['data']['user_id']
+        chat_ids = payload['data'].get('chat_ids', [])
+
+        for chat_str_id in chat_ids:
+            try:
+                chat_id = UUID(chat_str_id)
+            except ValueError:
+                continue
+
+            chats_ws = self._chats.get(chat_id, set())
+            for ws in chats_ws:
+                user_id, _ = self._ws_user_session.get(ws, (None, None))
+                if user_id == target_id:
+                    continue
+                try:
+                    await ws.send_json(payload)
+                except:
+                    pass
+
     def join_in_chat(self, ws: WebSocket, chat_id: UUID):
         """Добавить сокет в чат"""
         self._chats.setdefault(chat_id, set()).add(ws)
