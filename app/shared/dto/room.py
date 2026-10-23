@@ -40,10 +40,8 @@ class RoomDTO:
 class TopRoomsByMemberDTO:
     """DTO для получения информации о топ комнат по кол-ву участников."""
     chat_id: UUID
+    members_count: int
     owner_id: str
-    count_member: int
-    created_at: datetime
-    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True)

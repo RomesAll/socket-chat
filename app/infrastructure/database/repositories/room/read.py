@@ -1,7 +1,8 @@
+from typing import Sequence
 from uuid import UUID
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.infrastructure.database.models import Room, ChatMember
+from app.infrastructure.database.models import Room, ChatMember, User
 from app.shared.dto.enums import ChatRole
 from app.shared.dto.room import RoomDTO, RoomUserMemberDTO, TopRoomsByMemberDTO
 
@@ -17,6 +18,17 @@ class RoomReadRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+
+    async def get_room_members(self, room_id: UUID) -> Sequence[tuple[str, str]]:
+        """Получить участников комнаты"""
+        stmt = (
+            select(User.id, User.display_name, ChatMember.role)
+            .join(ChatMember, ChatMember.user_id == User.id)
+            .where(ChatMember.chat_id == room_id)
+        )
+        rows = (await self.session.execute(stmt)).all()
+        return rows
+
     async def top_rooms_by_member(self, top_count: int) -> list[TopRoomsByMemberDTO]:
         """
         Поучить список комнат по наибольшему кол-ву участников
@@ -31,6 +43,7 @@ class RoomReadRepository:
                 ChatMember.chat_id == Room.chat_id,
                 ChatMember.role == ChatRole.OWNER,
             )
+            .correlate(Room)
             .scalar_subquery()
             .label("owner_id")
         )
@@ -38,10 +51,8 @@ class RoomReadRepository:
         stmt = (
             select(
                 Room.chat_id,
-                Room.max_users,
                 members_count,
                 owner_subquery,
-                Room.created_at,
             )
             .join(ChatMember, ChatMember.chat_id == Room.chat_id)
             .group_by(Room.chat_id, Room.created_at, Room.max_users)
@@ -49,7 +60,11 @@ class RoomReadRepository:
             .limit(top_count)
         )
         rows = (await self.session.execute(stmt)).all()
-        return [TopRoomsByMemberDTO(**row._mapping) for row in rows]
+        return [TopRoomsByMemberDTO(
+            chat_id=row.chat_id,
+            members_count=row.members_count,
+            owner_id=row.owner_id
+        ) for row in rows]
 
     async def get_by_id(self, room_id: UUID) -> RoomDTO | None:
         """Получить комнату по ID или None."""
@@ -103,11 +118,12 @@ class RoomReadRepository:
             self, owner_id: str,
     ) -> tuple[list[UUID], dict[UUID, list[tuple[str, ChatRole]]]]:
         """
+        Получить чаты, где пользователь является владельцем комнаты.
         Возвращает:
         - список id комнат владельца;
         - dict[chat_id, list[(user_id, role)]] — все участники этих комнат.
         """
-        # 1) id комнат владельца
+        # id комнат владельца
         owner_rooms_stmt = (
             select(Room.chat_id)
             .join(ChatMember, ChatMember.chat_id == Room.chat_id)
@@ -120,7 +136,7 @@ class RoomReadRepository:
         if not room_ids:
             return [], {}
 
-        # 2) все участники этих комнат
+        # все участники этих комнат
         members_stmt = (
             select(ChatMember.chat_id, ChatMember.user_id, ChatMember.role)
             .where(ChatMember.chat_id.in_(room_ids))
