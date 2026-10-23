@@ -1,5 +1,4 @@
 from fastapi import Depends
-
 from app.business_logic.unit_of_work import UnitOfWork
 from app.business_logic.services import (
     UserService,
@@ -18,6 +17,11 @@ from app.business_logic.use_cases.auth import (
     LogoutUseCase,
     LogoutAllUseCase,
 )
+from app.business_logic.use_cases.auth.revoke_all_user_tokens import RevokeAllUserTokens
+from app.business_logic.use_cases.chat.get_group_chats import GetGroupChatsUseCase
+from app.business_logic.use_cases.chat.get_private_chats import GetPrivateChatsUseCase
+from app.business_logic.use_cases.message.get_file_path import GetFilePathUseCase
+from app.business_logic.use_cases.message.send_email_message import SendEmailMessage
 from app.business_logic.use_cases.user import (
     UpdateUserUseCase,
     DeleteUserUseCase,
@@ -64,10 +68,14 @@ from app.di.dependencies import (
     get_ws_broker,
     get_ws_manager,
     get_session_key_storage,
-    get_user_analytics_repo,
-    get_message_analytics_repo,
+    get_file_manager, get_state_config,
 )
+from app.infrastructure.email import EmailSender
+from app.infrastructure.redis import UnreadCache
 from app.infrastructure.security import SymmetricEncode
+from app.infrastructure.storage.file_manager import AsyncFileAdapter
+from app.infrastructure.websocket import WSBroker
+from app.shared.config import BaseConfig
 
 
 # auth use-cases
@@ -77,12 +85,14 @@ def get_register_user_use_case(
     verification_service: VerificationService = Depends(get_verification_service),
     email_sender=Depends(get_email_sender),
     uow: UnitOfWork = Depends(get_uow),
+    chat_service: ChatService = Depends(get_chat_service)
 ) -> RegisterUserUseCase:
     return RegisterUserUseCase(
         user_service=user_service,
         verification_service=verification_service,
         email_sender=email_sender,
         uow=uow,
+        chat_service=chat_service
     )
 
 
@@ -212,11 +222,13 @@ def get_create_room_use_case(
     chat_service: ChatService = Depends(get_chat_service),
     room_service: RoomService = Depends(get_room_service),
     uow: UnitOfWork = Depends(get_uow),
+    ws_broker: WSBroker = Depends(get_ws_broker)
 ) -> CreateRoomUseCase:
     return CreateRoomUseCase(
         chat_service=chat_service,
         room_service=room_service,
         uow=uow,
+        ws_broker=ws_broker
     )
 
 
@@ -261,12 +273,14 @@ def get_join_by_invite_use_case(
     room_service: RoomService = Depends(get_room_service),
     invite_service: InviteTokenService = Depends(get_invite_token_service),
     uow: UnitOfWork = Depends(get_uow),
+    ws_broker: WSBroker = Depends(get_ws_broker)
 ) -> JoinByInviteUseCase:
     return JoinByInviteUseCase(
         chat_service=chat_service,
         room_service=room_service,
         invite_service=invite_service,
         uow=uow,
+        ws_broker=ws_broker
     )
 
 
@@ -278,12 +292,14 @@ def get_join_invite_use_case(
     room_service: RoomService = Depends(get_room_service),
     invite_service: InviteTokenService = Depends(get_invite_token_service),
     uow: UnitOfWork = Depends(get_uow),
+    ws_broker: WSBroker = Depends(get_ws_broker)
 ) -> JoinByInviteUseCase:
     return JoinByInviteUseCase(
         chat_service=chat_service,
         room_service=room_service,
         uow=uow,
-        invite_service=invite_service
+        invite_service=invite_service,
+        ws_broker=ws_broker
     )
 
 
@@ -302,8 +318,24 @@ def get_generate_invite_use_case(
 def get_remove_chat_member_use_case(
     chat_service: ChatService = Depends(get_chat_service),
     uow: UnitOfWork = Depends(get_uow),
+    ws_broker: WSBroker = Depends(get_ws_broker)
 ) -> RemoveChatMemberUseCase:
-    return RemoveChatMemberUseCase(chat_service=chat_service, uow=uow)
+    return RemoveChatMemberUseCase(chat_service=chat_service, uow=uow, ws_broker=ws_broker)
+
+
+def get_send_email_use_case(
+    user_service: UserService = Depends(get_user_service),
+    email_sender: EmailSender = Depends(get_email_sender)
+) -> SendEmailMessage:
+    return SendEmailMessage(email_sender, user_service)
+
+
+def get_revoke_user_tokens(
+    user_service: UserService = Depends(get_user_service),
+    ws_broker: WSBroker = Depends(get_ws_broker),
+    token_service: TokenService = Depends(get_token_service)
+) -> RevokeAllUserTokens:
+    return RevokeAllUserTokens(token_service, user_service, ws_broker)
 
 
 def get_change_chat_member_role_use_case(
@@ -330,7 +362,9 @@ def get_send_message_use_case(
     unread=Depends(get_unread_cache),
     ws_broker=Depends(get_ws_broker),
     uow: UnitOfWork = Depends(get_uow),
-    encoder: SymmetricEncode = Depends(get_cipher)
+    encoder: SymmetricEncode = Depends(get_cipher),
+    file_storage: AsyncFileAdapter = Depends(get_file_manager),
+    config: BaseConfig = Depends(get_state_config)
 ) -> SendMessageUseCase:
     return SendMessageUseCase(
         message_service=message_service,
@@ -338,7 +372,9 @@ def get_send_message_use_case(
         unread_cache=unread,
         ws_broker=ws_broker,
         uow=uow,
-        encoder=encoder
+        encoder=encoder,
+        file_storage=file_storage,
+        config=config
     )
 
 
@@ -417,4 +453,38 @@ def get_disconnect_ws_use_case(
         manager=manager,
         ws_broker=ws_broker,
         presence=presence,
+    )
+
+
+def get_file_path_use_case(
+    chat_service: ChatService = Depends(get_chat_service),
+    message_service: MessageService = Depends(get_message_service)
+) -> GetFilePathUseCase:
+    return GetFilePathUseCase(
+        chat_service=chat_service,
+        message_service=message_service
+    )
+
+
+def get_private_chats_use_case(
+    chat_service: ChatService = Depends(get_chat_service),
+    unread_cache: UnreadCache = Depends(get_unread_cache),
+    encoder: SymmetricEncode = Depends(get_cipher)
+):
+    return GetPrivateChatsUseCase(
+        chat_service,
+        unread_cache,
+        encoder
+    )
+
+
+def get_group_chats_use_case(
+    chat_service: ChatService = Depends(get_chat_service),
+    unread_cache: UnreadCache = Depends(get_unread_cache),
+    encoder: SymmetricEncode = Depends(get_cipher)
+):
+    return GetGroupChatsUseCase(
+        chat_service,
+        unread_cache,
+        encoder
     )
