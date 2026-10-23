@@ -13,11 +13,14 @@ class EmailSender:
         self.sender_email = sender_email
         self.password = password
 
-    def send_accept_code(self, to: str, code: str):
+    async def send_accept_code(self, to: str, code: str):
         """Отправка кода подтверждения"""
-        self._send(to, f'Код: {code}', 'Отправка кода подтверждения для доступа к мессенджеру')
+        await self._send(to, f'Код: {code}', 'Отправка кода подтверждения для доступа к мессенджеру')
 
-    def _send(self, to: str, message: str, sub: str):
+    async def send_message(self, sender_id: str, to: str, msg: str):
+        await self._send(to, msg, f'Сообщение от администратора {sender_id}')
+
+    async def _send(self, to: str, message: str, sub: str):
         """Подключение к SMTP серверу и отправка сообщения"""
         msg = MIMEMultipart()
         msg['From'] = self.sender_email
