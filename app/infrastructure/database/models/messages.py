@@ -39,10 +39,14 @@ class Message(UuidIsMixin, Base):
         remote_side='Message.id',
         foreign_keys=[reply_to_message_id]
     )
-    forwarded_from = relationship(
+    forwarded_from: Mapped["Message | None"] = relationship(
         'Message',
         remote_side='Message.id',
         foreign_keys=[forwarded_from_message_id]
+    )
+    files: Mapped[list["MessageAttachment"]] = relationship(
+        back_populates='message',
+        cascade="all, delete-orphan"
     )
 
     @property
@@ -63,6 +67,7 @@ class MessageAttachment(UuidIsMixin, Base):
     file_path: Mapped[str]
     mime_type: Mapped[str]
     size: Mapped[int]
+    message: Mapped["Message"] = relationship(back_populates='files')
 
     @property
     def file(self) -> Path:
