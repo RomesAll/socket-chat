@@ -1,6 +1,17 @@
 from dataclasses import dataclass
 from uuid import UUID
+from app.shared.dto.chat import ChatDTO
 from app.shared.dto.enums import ChatRole
+
+
+@dataclass(frozen=True)
+class ChatAdded:
+    chat: ChatDTO
+
+
+@dataclass(frozen=True)
+class ChatInvalidate:
+    chat_id: UUID
 
 
 @dataclass(frozen=True)

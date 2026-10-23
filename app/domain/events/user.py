@@ -22,6 +22,12 @@ class UserDeleted:
 
 
 @dataclass(frozen=True)
+class UserUpdatedRole:
+    """Пользователь обновлён."""
+    user_id: str
+
+
+@dataclass(frozen=True)
 class UserPasswordChanged(UserDeleted):
     """Пароль пользователя изменён."""
     pass

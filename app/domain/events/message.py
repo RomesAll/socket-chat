@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from uuid import UUID
-from app.shared.dto.message import MessageEncryptedReadDTO
+from app.shared.dto.message import MessageEncryptedGetDTO
 
 
 @dataclass(frozen=True)
 class MessageSent:
     """Сообщение отправлено."""
-    message: MessageEncryptedReadDTO
+    message: MessageEncryptedGetDTO
 
 
 @dataclass(frozen=True)
