@@ -9,9 +9,8 @@ class UnreadCache(LogMixin):
     Адаптер для кеша счётчиков непрочитанных сообщений.
     """
 
-    def __init__(self, client: Redis, ttl: int | None = None):
+    def __init__(self, client: Redis):
         self._client = client
-        self._ttl = ttl
         self._prefix = 'user_count_msg_unread'
 
     def _key(self, user_id: str) -> str:
@@ -23,8 +22,6 @@ class UnreadCache(LogMixin):
         Увеличить счётчик непрочитанных для чата.
         """
         result = await self._client.hincrby(self._key(user_id), str(chat_id))
-        if self._ttl:
-            await self._client.expire(self._key(user_id), self._ttl, nx=True)
         return result
 
     @exception_handler(generate_exc=False)
