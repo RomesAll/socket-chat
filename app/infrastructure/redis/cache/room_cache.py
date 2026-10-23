@@ -19,7 +19,7 @@ class RoomCache(LogMixin):
     - детальную информацию о комнате (RoomDetailsDTO).
     """
 
-    def __init__(self, client: Redis, ttl: int = 3600):
+    def __init__(self, client: Redis, ttl: int):
         self._client = client
         self._ttl = ttl
         self._prefix = 'room_info'
@@ -65,6 +65,7 @@ class RoomCache(LogMixin):
             avatar_url=data['avatar_url'],
             created_at=datetime.fromisoformat(data['created_at']),
             updated_at=datetime.fromisoformat(data['updated_at']),
+            max_users=data['max_users']
         )
 
     @exception_handler(generate_exc=False)
