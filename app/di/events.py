@@ -4,7 +4,7 @@ from app.domain.events.user import (
     UserCreated,
     UserUpdated,
     UserDeleted,
-    UserPasswordChanged,
+    UserPasswordChanged, UserUpdatedRole,
 )
 from app.domain.events.room import (
     RoomCreated,
@@ -15,7 +15,7 @@ from app.domain.events.chat import (
     ChatMemberAdded,
     ChatMemberRemoved,
     ChatMemberRoleChanged,
-    ChatOwnershipTransferred,
+    ChatOwnershipTransferred, ChatAdded, ChatInvalidate,
 )
 from app.domain.events.message import (
     MessageSent,
@@ -25,7 +25,7 @@ from app.domain.events.message import (
 from app.infrastructure.mongo.analytics.repositories import ChatAnalyticsRepository, UserAnalyticsRepository, \
     RoomAnalyticsRepository, MessageAnalyticsRepository
 from app.infrastructure.mongo.audit.repositories import AuditRepository
-from app.infrastructure.redis import JWTWhiteListCache, UserCache, RoomCache, ChatMessageCache
+from app.infrastructure.redis import JWTWhiteListCache, UserCache, RoomCache, ChatMessageCache, ChatCache
 from app.shared.event_handlers import (
     SaveAuditEventToMongo,
     SaveRoomMemberEvent,
@@ -33,7 +33,6 @@ from app.shared.event_handlers import (
     RoleChangeEvent,
     ChatOwnershipEvent,
     MessageSentEvent,
-    MessageSaveToCacheOnMessageCreated,
     MessageEditedEvent,
     MessageDeletedEvent,
     SaveRoomEvent,
@@ -52,6 +51,9 @@ from app.shared.event_handlers import (
     ChangePswUserEvent,
     RevokeAllTokensOnUserPasswordChanged
 )
+from app.shared.event_handlers.chat import SaveNewChatInCache, InvalidateCacheInChat
+from app.shared.event_handlers.user import RevokeAllTokensOnUserRoleChanged, InvalidateUserCacheChangePsw, \
+    InvalidateUserCacheChangeRole
 
 
 def register_event_handlers(
@@ -64,30 +66,44 @@ def register_event_handlers(
     user_repo: UserAnalyticsRepository,
     user_cache: UserCache,
     room_cache: RoomCache,
-    chat_msg_cache: ChatMessageCache
+    chat_cache: ChatCache
 ):
     """Зарегистрировать все обработчики доменных событий."""
+
+    # События сообщений
     registry.sub(MessageSent, MessageSentEvent(repo=msg_repo).handle)
-    registry.sub(MessageSent, MessageSaveToCacheOnMessageCreated(cache=chat_msg_cache).handle)
     registry.sub(MessageEdited, MessageEditedEvent(repo=msg_repo).handle)
     registry.sub(MessageDeleted, MessageDeletedEvent(repo=msg_repo).handle)
-    registry.sub(RoomCreated, SaveRoomEvent(repo=room_repo).handle)
-    registry.sub(RoomUpdated, UpdateRoomEvent(repo=room_repo).handle)
-    registry.sub(RoomDeleted, DeleteRoomEvent(repo=room_repo).handle)
-    registry.sub(RoomCreated, SaveRoomToCacheOnRoomCreated(cache=room_cache).handle)
-    registry.sub(RoomUpdated, InvalidateRoomCacheOnRoomUpdated(cache=room_cache).handle)
-    registry.sub(RoomDeleted, InvalidateRoomCacheOnRoomDeleted(cache=room_cache).handle)
-    registry.sub(UserCreated, SaveUserEvent(repo=user_repo).handle)
-    registry.sub(UserCreated, SaveUserToCacheOnUserCreated(cache=user_cache).handle)
-    registry.sub(UserUpdated, UpdateUserEvent(repo=user_repo).handle)
-    registry.sub(UserUpdated, InvalidateUserCacheOnUserUpdated(cache=user_cache).handle)
-    registry.sub(UserDeleted, DeleteUserEvent(repo=user_repo).handle)
-    registry.sub(UserDeleted, InvalidateUserCacheOnUserDeleted(cache=user_cache).handle)
-    registry.sub(UserDeleted, RevokeAllTokensOnUserDeleted(jwt_white_list=jwt_white_list).handle)
-    registry.sub(UserPasswordChanged, ChangePswUserEvent(repo=user_repo).handle)
-    registry.sub(UserPasswordChanged, RevokeAllTokensOnUserPasswordChanged(jwt_white_list=jwt_white_list).handle)
+
+    # События чатов
+    registry.sub(ChatAdded, SaveNewChatInCache(cache=chat_cache).handle)
+    registry.sub(ChatInvalidate, InvalidateCacheInChat(cache=chat_cache).handle)
     registry.sub(ChatMemberAdded, SaveRoomMemberEvent(repo=chat_repo).handle)
     registry.sub(ChatMemberRemoved, RemoveRoomMemberEvent(repo=chat_repo).handle)
     registry.sub(ChatMemberRoleChanged, RoleChangeEvent(repo=chat_repo).handle)
     registry.sub(ChatOwnershipTransferred, ChatOwnershipEvent(repo=chat_repo).handle)
+
+    # События комнат
+    registry.sub(RoomCreated, SaveRoomToCacheOnRoomCreated(cache=room_cache).handle)
+    registry.sub(RoomCreated, SaveRoomEvent(repo=room_repo).handle)
+    registry.sub(RoomUpdated, InvalidateRoomCacheOnRoomUpdated(cache=room_cache).handle)
+    registry.sub(RoomUpdated, UpdateRoomEvent(repo=room_repo).handle)
+    registry.sub(RoomDeleted, InvalidateRoomCacheOnRoomDeleted(cache=room_cache).handle)
+    registry.sub(RoomDeleted, DeleteRoomEvent(repo=room_repo).handle)
+
+    # События пользователей
+    registry.sub(UserCreated, SaveUserToCacheOnUserCreated(cache=user_cache).handle)
+    registry.sub(UserCreated, SaveUserEvent(repo=user_repo).handle)
+    registry.sub(UserUpdated, InvalidateUserCacheOnUserUpdated(cache=user_cache).handle)
+    registry.sub(UserUpdated, UpdateUserEvent(repo=user_repo).handle)
+    registry.sub(UserDeleted, InvalidateUserCacheOnUserDeleted(cache=user_cache).handle)
+    registry.sub(UserDeleted, DeleteUserEvent(repo=user_repo).handle)
+    registry.sub(UserDeleted, RevokeAllTokensOnUserDeleted(jwt_white_list=jwt_white_list).handle)
+    registry.sub(UserPasswordChanged, ChangePswUserEvent(repo=user_repo).handle)
+    registry.sub(UserPasswordChanged, RevokeAllTokensOnUserPasswordChanged(jwt_white_list=jwt_white_list).handle)
+    registry.sub(UserUpdatedRole, RevokeAllTokensOnUserRoleChanged(jwt_white_list=jwt_white_list).handle)
+    registry.sub(UserPasswordChanged, InvalidateUserCacheChangePsw(cache=user_cache).handle)
+    registry.sub(UserUpdatedRole, InvalidateUserCacheChangeRole(cache=user_cache).handle)
+
+    # Аудит действий пользователя
     registry.sub(AuditEvent, SaveAuditEventToMongo(repo=audit_repo).handle)
