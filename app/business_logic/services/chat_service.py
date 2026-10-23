@@ -2,6 +2,7 @@ from uuid import UUID
 from app.business_logic.mappers.chat_mapper import ChatMapper
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events import ChatMemberAdded, ChatMemberRoleChanged, ChatMemberRemoved, ChatOwnershipTransferred
+from app.domain.events.chat import ChatAdded, ChatInvalidate
 from app.infrastructure.redis import ChatCache
 from app.shared.dto.chat import ChatSaveDTO, ChatDTO, ChatUpdateDTO, ChatMemberDTO, ChatMemberSaveDTO, \
     ChatMemberUpdateDTO
@@ -17,9 +18,15 @@ class ChatService(LogMixin):
         self._mapper = mapper
         self._cache = cache
 
+    async def get_private_chats_preview(self, user_id: str):
+        return await self._uow.chat_read_repo.get_private_chats_preview(user_id)
+
+    async def get_group_chats_preview(self, user_id: str):
+        return await self._uow.chat_read_repo.get_group_chats_preview(user_id)
+
     async def find_between_users(self, user_1: str, user_2: str) -> ChatDTO | None:
         """Получить чат между двумя пользователями"""
-        return self._uow.chat_read_repo.find_between_users(user_1, user_2)
+        return await self._uow.chat_read_repo.find_between_users(user_1, user_2)
 
     async def get(self, chat_id: UUID) -> ChatDTO:
         """
@@ -47,9 +54,9 @@ class ChatService(LogMixin):
         """Поиск информацию о чате. Вернет None, если не найдена запись."""
         return await self._uow.chat_read_repo.find_by_id(chat_id)
 
-    async def get_chats_user(self, user_id: str) -> list[ChatDTO]:
+    async def get_user_chat_ids(self, user_id: str) -> list[UUID]:
         """Получить информацию о чатах пользователя. Вернет пустой list, если чатов нет."""
-        return await self._uow.chat_read_repo.get_user_chats(user_id)
+        return await self._uow.chat_read_repo.get_user_chat_ids(user_id)
 
     async def user_is_member(self, user_id: str, chat_id: UUID) -> bool:
         """Является ли пользователь участником чата."""
@@ -59,6 +66,9 @@ class ChatService(LogMixin):
         """Сохранить информацию о чате."""
         chat_orm = await self._uow.chat_repo.save(chat_dto)
         saved_chat = self._mapper.chat_to_dto(chat_orm)
+        self._uow.add_event(ChatAdded(
+            chat=saved_chat
+        ))
         self.log_info(f"Создан чат {saved_chat.id}")
         return saved_chat
 
@@ -66,6 +76,9 @@ class ChatService(LogMixin):
         """Обновить информацию о чате."""
         chat_orm = await self._uow.chat_repo.update(chat_id, chat_dto)
         updated_chat = self._mapper.chat_to_dto(chat_orm)
+        self._uow.add_event(ChatInvalidate(
+            chat_id=chat_id
+        ))
         self.log_info(f"Обновлен чат {updated_chat.id}")
         return updated_chat
 
@@ -73,6 +86,9 @@ class ChatService(LogMixin):
         """Удалить информацию о пользователе."""
         chat_orm = await self._uow.chat_repo.delete(chat_id)
         deleted_chat = self._mapper.chat_to_dto(chat_orm)
+        self._uow.add_event(ChatInvalidate(
+            chat_id=chat_id
+        ))
         self.log_info(f"Удалён чат {deleted_chat.id}")
         return deleted_chat
 
@@ -83,6 +99,10 @@ class ChatService(LogMixin):
     async def is_admin(self, chat_id: UUID, user_id: str) -> bool:
         """Является ли пользователь owner или admin чата."""
         return await self._uow.chat_member_read_repo.is_admin(chat_id, user_id)
+
+    async def is_owner(self, chat_id: UUID, user_id: str) -> bool:
+        """Является ли пользователь owner или admin чата."""
+        return await self._uow.chat_member_read_repo.is_owner(chat_id, user_id)
 
     async def get_member(self, chat_id: UUID, user_id: str) -> ChatMemberDTO:
         """
@@ -185,3 +205,37 @@ class ChatService(LogMixin):
         self.log_info(
             f"В чате {chat_id} владелец сменился с {from_user} на {to_user}"
         )
+
+    async def transfer_ownership_on_leave(self, chat_id: UUID, leaving_user: str) -> str | None:
+        """
+        Передать владение, если уходит OWNER.
+        Возвращает ID нового владельца.
+        """
+        members = await self._uow.chat_member_read_repo.list_by_chat(chat_id)
+
+        # Ищем замену (сначала ADMIN, потом MEMBER)
+        new_owner_id = None
+        for m in members:
+            if m.user_id == leaving_user:
+                continue
+            if m.role == ChatRole.ADMIN:
+                new_owner_id = m.user_id
+                break
+
+        if not new_owner_id:
+            for m in members:
+                if m.user_id == leaving_user:
+                    continue
+                if m.role == ChatRole.MEMBER:
+                    new_owner_id = m.user_id
+                    break
+
+        if new_owner_id:
+            await self.transfer_ownership(
+                chat_id=chat_id,
+                from_user=leaving_user,
+                to_user=new_owner_id,
+            )
+            return new_owner_id
+
+        return None
