@@ -13,7 +13,7 @@ class ChatCache(LogMixin):
     Адаптер для кеша информации о чатах и пользователей чатов.
     """
 
-    def __init__(self, client: Redis, ttl: int = 3600):
+    def __init__(self, client: Redis, ttl: int):
         self._client = client
         self._ttl = ttl
         self._prefix = 'chat'
@@ -49,7 +49,7 @@ class ChatCache(LogMixin):
         key = self._key_chat(chat_dto.id)
         raw_data = asdict(chat_dto)
         raw_data['id'] = str(raw_data['id'])
-        raw_data['type'] = str(raw_data['type'])
+        raw_data['type'] = str(raw_data['type'].value)
         raw_data['created_at'] = raw_data['created_at'].isoformat()
         raw_data['updated_at'] = raw_data['updated_at'].isoformat()
         if chat_dto.last_message_at:
@@ -66,3 +66,6 @@ class ChatCache(LogMixin):
         if not is_saved:
             self.log_warning(f'Чат {chat_dto.id} не была сохранен в кеше')
         return is_saved
+
+    async def delete(self, chat_id: UUID) -> bool:
+        return bool(await self._client.delete(self._key_chat(chat_id)))
