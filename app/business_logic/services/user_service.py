@@ -2,9 +2,10 @@ from dataclasses import asdict
 from app.business_logic.mappers.user_mapper import UserMapper
 from app.business_logic.unit_of_work import UnitOfWork
 from app.domain.events import UserCreated, UserUpdated, UserPasswordChanged, UserDeleted
+from app.domain.events.user import UserUpdatedRole
 from app.infrastructure.redis import UserCache
 from app.infrastructure.security import PasswordManager
-from app.shared.dto.base import UNSET, _UnsetType
+from app.shared.dto.base import _UnsetType
 from app.shared.dto.enums import RoleEnum
 from app.shared.dto.user import UserDtoGet, UserDtoBriefGet, UserUpdateDTO, UserEncryptedSaveDTO
 from app.shared.log_config import LogMixin
@@ -60,7 +61,7 @@ class UserService(LogMixin):
         cached = await self._cache.get(user_id)
         if cached:
             return cached.to_brief()
-        user_orm = await self._uow.user_repo.get_records(user_id)
+        user_orm = await self._uow.user_repo.get_record_by_id(user_id)
         user_dto = self._mapper.to_dto(user_orm)
         self._uow.add_after_commit(lambda: self._cache.save(user_dto))
         return user_dto.to_brief()
@@ -141,6 +142,9 @@ class UserService(LogMixin):
         """Обновить роль пользователя"""
         user_orm = await self._uow.user_repo.change_role(user_id, new_role)
         updated_user = self._mapper.to_dto(user_orm)
+        self._uow.add_event(UserUpdatedRole(
+            user_id=user_id
+        ))
         self.log_info(f"Для пользователя {user_id} была изменена роль на {new_role}")
         return updated_user
 
