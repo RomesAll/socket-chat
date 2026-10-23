@@ -46,8 +46,8 @@ class UnitOfWork(LogMixin):
                 for fn in self._after_commit:
                     try:
                         await fn()
-                    except Exception:
-                        self.log_error(f"Не удалось выполнить отложенное действие после commit: {fn}")
+                    except Exception as exc:
+                        self.log_error(f"Не удалось выполнить отложенное действие после commit: {fn}, {exc}")
 
                 for event in self._events:
                     try:
