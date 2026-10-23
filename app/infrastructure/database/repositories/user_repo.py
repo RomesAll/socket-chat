@@ -79,6 +79,7 @@ class UserRepository(
         if user_info.role != new_role:
             user_info.role = new_role
             await self.session.flush()
+            await self.session.refresh(user_info)
         return user_info
 
     async def change_email(self, user_id: str, new_email: str) -> User:
