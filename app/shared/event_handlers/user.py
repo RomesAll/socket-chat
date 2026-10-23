@@ -3,7 +3,7 @@ from app.domain.events.user import (
     UserCreated,
     UserUpdated,
     UserDeleted,
-    UserPasswordChanged,
+    UserPasswordChanged, UserUpdatedRole,
 )
 from app.infrastructure.redis.cache.user_cache import UserCache
 from app.infrastructure.redis.jwt_white_list import JWTWhiteListCache
@@ -14,9 +14,6 @@ from app.infrastructure.mongo.analytics.documents import (
     UserCreatedDoc
 )
 from app.infrastructure.mongo.analytics.repositories import UserAnalyticsRepository
-
-
-#------------Обработчики событий сохранения пользователя-----------
 
 
 class SaveUserEvent:
@@ -44,9 +41,6 @@ class SaveUserToCacheOnUserCreated:
         await self._cache.save(event.user)
 
 
-#------------Обработчики событий обновлений пользователя-----------
-
-
 class UpdateUserEvent:
     """Обработчик события обновления пользователя для аналитики в Mongodb"""
 
@@ -69,9 +63,6 @@ class InvalidateUserCacheOnUserUpdated:
 
     async def handle(self, event: UserUpdated) -> None:
         await self._cache.delete(event.user.id)
-
-
-#------------Обработчики событий удаления пользователя-----------
 
 
 class DeleteUserEvent:
@@ -107,9 +98,6 @@ class RevokeAllTokensOnUserDeleted:
         await self._jwt_white_list.clear_user_token(event.user_id)
 
 
-#------------Обработчики событий смены пароля пользователя-----------
-
-
 class ChangePswUserEvent:
     """Добавить доменное событие обновления пользователя в MongoDB."""
 
@@ -131,3 +119,33 @@ class RevokeAllTokensOnUserPasswordChanged:
 
     async def handle(self, event: UserPasswordChanged) -> None:
         await self._jwt_white_list.clear_user_token(event.user_id)
+
+
+class RevokeAllTokensOnUserRoleChanged:
+    """Отозвать все refresh-токены при смене роли."""
+
+    def __init__(self, jwt_white_list: JWTWhiteListCache):
+        self._jwt_white_list = jwt_white_list
+
+    async def handle(self, event: UserUpdatedRole) -> None:
+        await self._jwt_white_list.clear_user_token(event.user_id)
+
+
+class InvalidateUserCacheChangePsw:
+    """Обработчик события удаления пользователя для инвалидации кеша в Redis"""
+
+    def __init__(self, cache: UserCache):
+        self._cache = cache
+
+    async def handle(self, event: UserPasswordChanged) -> None:
+        await self._cache.delete(event.user_id)
+
+
+class InvalidateUserCacheChangeRole:
+    """Обработчик события удаления пользователя для инвалидации кеша в Redis"""
+
+    def __init__(self, cache: UserCache):
+        self._cache = cache
+
+    async def handle(self, event: UserUpdatedRole) -> None:
+        await self._cache.delete(event.user_id)

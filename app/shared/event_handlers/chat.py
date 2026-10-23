@@ -3,7 +3,7 @@ from app.domain.events.chat import (
     ChatMemberAdded,
     ChatMemberRemoved,
     ChatMemberRoleChanged,
-    ChatOwnershipTransferred,
+    ChatOwnershipTransferred, ChatAdded, ChatInvalidate,
 )
 from app.infrastructure.mongo.analytics.documents import (
     ChatMemberRoleChangedDoc,
@@ -12,7 +12,24 @@ from app.infrastructure.mongo.analytics.documents import (
     ChatChangeOwnerDoc
 )
 from app.infrastructure.mongo.analytics.repositories import ChatAnalyticsRepository
+from app.infrastructure.redis import ChatCache
 from app.infrastructure.redis.cache.room_cache import RoomCache
+
+
+class SaveNewChatInCache:
+    def __init__(self, cache: ChatCache):
+        self._cache = cache
+
+    async def handle(self, event: ChatAdded) -> None:
+        await self._cache.save(event.chat)
+
+
+class InvalidateCacheInChat:
+    def __init__(self, cache: ChatCache):
+        self._cache = cache
+
+    async def handle(self, event: ChatInvalidate) -> None:
+        await self._cache.delete(event.chat_id)
 
 
 class SaveRoomMemberEvent:
