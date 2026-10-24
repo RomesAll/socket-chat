@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  chat_app_test:
-    build: .
-    container_name: chat_test
-    ports:
-      - "8000:8000"
-    profiles: ["app"]
-    volumes:
-      - .:/app
-
   redis_test:
     image: redis:5-alpine
     container_name: redis_test
@@ -34,18 +25,6 @@ services:
       postgres
       -c timezone=UTC
       -c log_timezone=UTC
-
-  pgadmin_test:
-    image: dpage/pgadmin4:latest
-    container_name: pgadmin_panel_test
-    restart: always
-    ports:
-      - "5049:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    depends_on:
-      - postgres_test
 
   mongodb_test:
     image: mongo:latest
