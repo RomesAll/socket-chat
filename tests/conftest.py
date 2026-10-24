@@ -1,8 +1,13 @@
+from datetime import timedelta
+
 import pytest
 from typing import AsyncGenerator
+
+from motor.motor_asyncio import AsyncIOMotorClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.infrastructure.database.models import Base
+from app.infrastructure.security import JWTFacade, JWTAccessManager, JWTRefreshManager
 from app.shared.config import create_config, AppMode
 from mongotic.asyncio import AsyncSession as MongoticAsyncSession
 from mongotic.asyncio import create_async_engine as mongo_create_async_engine
@@ -62,3 +67,28 @@ async def db_mongo_session() -> AsyncGenerator[AsyncSession, None]:
 async def redis_client():
     client = Redis.from_url(config.redis.url)
     return client
+
+
+@pytest.fixture(scope='function')
+async def mongo_client():
+    client = AsyncIOMotorClient(config.mongodb.url)
+    db = client['test_db']
+    collection = db['test_collection']
+    return collection
+
+
+@pytest.fixture(scope='function')
+async def jwt_facade() -> JWTFacade:
+    facade = JWTFacade(
+        access_manager=JWTAccessManager(
+            secret_key=config.jwt_access.secretkey,
+            alg=config.jwt_access.algorithm,
+            expires_delta=timedelta(config.jwt_access.expiresdelta)
+        ),
+        refresh_manager=JWTRefreshManager(
+            secret_key=config.jwt_refresh.secretkey,
+            alg=config.jwt_refresh.algorithm,
+            expires_delta=timedelta(config.jwt_refresh.expiresdelta)
+        )
+    )
+    return facade
