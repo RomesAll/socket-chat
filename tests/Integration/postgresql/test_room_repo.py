@@ -1,7 +1,7 @@
 from uuid import uuid4
-from app.data_layer.models import Room, User, Chat, ChatMember
-from app.data_layer.repositories.room.read import RoomReadRepository
-from app.data_layer.repositories.room.write import RoomRepository
+from app.infrastructure.database.models import Chat
+from app.infrastructure.database.repositories import RoomReadRepository
+from app.infrastructure.database.repositories import RoomRepository
 from app.shared.dto.room import RoomSaveDTO, RoomUpdateDTO
 from app.shared.dto.enums import ChatRole, ChatType
 

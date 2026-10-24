@@ -1,5 +1,5 @@
 from uuid import uuid4
-from app.data_layer.repositories import MessageRepository
+from app.infrastructure.database.repositories import MessageRepository
 from app.shared.dto.enums import MessageType
 from app.shared.dto.message import MessageEncryptedSavedDTO
 
@@ -23,7 +23,7 @@ async def test_save_new_msg_success(db_session, private_chat_setup):
         chat_id=chat_id,
         sender_id=sender_id,
         type=MessageType.TEXT,
-        body_encrypted='hello',
+        body_encrypted=b'hello',
         reply_to_message_id=None,
         forwarded_from_message_id=None,
         forwarded_from_user_id=None

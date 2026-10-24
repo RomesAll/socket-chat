@@ -1,9 +1,8 @@
 import pytest
 from typing import AsyncGenerator
-
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.data_layer.models import Base
+from app.infrastructure.database.models import Base
 from app.shared.config import create_config, AppMode
 from mongotic.asyncio import AsyncSession as MongoticAsyncSession
 from mongotic.asyncio import create_async_engine as mongo_create_async_engine

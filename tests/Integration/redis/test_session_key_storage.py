@@ -1,5 +1,5 @@
 from uuid import uuid4
-from app.business_logic.redis_adapter import SessionKeyStorage
+from app.infrastructure.redis.session_key_storage import SessionKeyStorage
 
 
 async def test_save_session_key(redis_client):

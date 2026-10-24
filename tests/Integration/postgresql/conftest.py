@@ -1,6 +1,6 @@
 from uuid import uuid4, UUID
 import pytest
-from app.data_layer.models import Chat, Room, User, ChatMember, Message
+from app.infrastructure.database.models import Chat, Room, User, ChatMember, Message
 from app.shared.dto.enums import ChatType, ChatRole, RoleEnum, MessageType
 
 
@@ -107,7 +107,7 @@ async def message_setup(
         id=uuid4(),
         chat_id=private_chat_setup['chat'].id,
         sender_id=private_chat_setup['members'][0].user_id,
-        body_encrypted='hello',
+        body_encrypted=b'hello',
         type=MessageType.TEXT
     )
     db_session.add(message)

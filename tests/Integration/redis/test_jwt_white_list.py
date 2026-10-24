@@ -1,5 +1,5 @@
 from uuid import uuid4
-from app.business_logic.redis_adapter import JWTWhiteListCache
+from app.infrastructure.redis.jwt_white_list import JWTWhiteListCache
 
 
 async def test_save_refresh_token(redis_client):

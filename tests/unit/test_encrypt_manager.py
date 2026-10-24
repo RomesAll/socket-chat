@@ -1,4 +1,4 @@
-from app.business_logic.encrypte_manager import SymmetricEncode
+from app.infrastructure.security.encrypte_manager import SymmetricEncode
 
 
 async def test_encrypt_message_success():

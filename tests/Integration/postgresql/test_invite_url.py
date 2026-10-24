@@ -1,7 +1,7 @@
 from uuid import uuid4
 import pytest
 from app.business_logic.exceptions import UrlTokenMaxUses
-from app.data_layer.repositories.invite_url_repo import InviteUrlRepo
+from app.infrastructure.database.repositories.invite_url_repo import InviteUrlRepo
 from app.shared.dto.room import GenerateInviteToken
 from datetime import datetime, timezone, timedelta
 

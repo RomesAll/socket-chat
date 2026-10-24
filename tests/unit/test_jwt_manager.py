@@ -1,5 +1,5 @@
 from uuid import uuid4
-from app.business_logic.jwt_manager import JWTFacade, JWTAccessManager, JWTRefreshManager
+from app.infrastructure.security.jwt_manager import JWTFacade, JWTAccessManager, JWTRefreshManager
 from app.shared.dto.enums import RoleEnum
 
 
