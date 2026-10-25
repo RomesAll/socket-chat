@@ -1,5 +1,5 @@
 from uuid import UUID
-from app.business_logic.services import ChatService
+from app.business_logic.services import ChatService, UserService
 from app.infrastructure.redis import PresenceCache, SessionKeyStorage
 from app.infrastructure.websocket import UserConnectionManager, WSBroker
 from app.shared.log_config import LogMixin
@@ -20,6 +20,7 @@ class DisconnectWebSocketUseCase(LogMixin):
     def __init__(
         self,
         chat_service: ChatService,
+        user_service: UserService,
         session_storage: SessionKeyStorage,
         manager: UserConnectionManager,
         ws_broker: WSBroker,
@@ -30,6 +31,7 @@ class DisconnectWebSocketUseCase(LogMixin):
         self._manager = manager
         self._ws_broker = ws_broker
         self._presence = presence
+        self._user_service = user_service
 
     async def execute(
         self,
@@ -55,5 +57,17 @@ class DisconnectWebSocketUseCase(LogMixin):
         if not self._manager.is_online(user_id):
             await self._presence.set_offline(user_id)
             await self._ws_broker.publish_user_status(user_id, False, chats)
+
+        try:
+            admins = await self._user_service.get_admins()
+            for admin in admins:
+                if admin.id != user_id:
+                    await self._ws_broker.publish_to_user(
+                        action_type="user_status",
+                        user_id=admin.id,
+                        data={"user_id": user_id, "status": True}
+                    )
+        except Exception as e:
+            self.log_error(f"Не удалось разослать статус админам: {e}")
 
         self.log_info(f"Пользователь {user_id} отключился (session={session_id})")
