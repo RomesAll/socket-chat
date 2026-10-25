@@ -1,5 +1,9 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.business_logic.exceptions import (
+    PermissionError,
+    AlreadyExistsError,
+)
 from app.business_logic.use_cases.chat import (
     GenerateInviteLinkUseCase,
     JoinByInviteUseCase,
@@ -30,13 +34,18 @@ async def generate_invite_link(
     request_meta: RequestMeta = Depends(get_request_meta),
     use_case: GenerateInviteLinkUseCase = Depends(get_generate_invite_link_use_case),
 ):
-    return await use_case.execute(
-        room_id=room_id,
-        hours=cmd.hours,
-        max_uses=cmd.max_uses,
-        actor_id=payload.user_id,
-        request_meta=request_meta,
-    )
+    try:
+        return await use_case.execute(
+            room_id=room_id,
+            hours=cmd.hours,
+            max_uses=cmd.max_uses,
+            actor_id=payload.user_id,
+            request_meta=request_meta,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось сгенерировать ссылку-приглашение")
 
 
 @router.post(
@@ -49,8 +58,15 @@ async def join_by_invite(
     request_meta: RequestMeta = Depends(get_request_meta),
     use_case: JoinByInviteUseCase = Depends(get_join_by_invite_use_case),
 ):
-    return await use_case.execute(
-        token=token,
-        actor_id=payload.user_id,
-        request_meta=request_meta,
-    )
+    try:
+        return await use_case.execute(
+            token=token,
+            actor_id=payload.user_id,
+            request_meta=request_meta,
+        )
+    except AlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось вступить в комнату по ссылке")
