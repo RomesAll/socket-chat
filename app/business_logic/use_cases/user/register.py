@@ -83,7 +83,7 @@ class RegisterUserUseCase(LogMixin):
         # Добавить чат по умолчанию для пользователя
         default_chat = await self._chat_service.save(ChatSaveDTO(
             id=uuid4(),
-            type=ChatType.PRIVATE,
+            type=ChatType.FAVORITES,
         ))
         await self._chat_service.add_member(ChatMemberSaveDTO(
             chat_id=default_chat.id,
