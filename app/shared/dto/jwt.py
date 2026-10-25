@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 from pydantic import BaseModel, Field
 from enum import Enum
-from app.data_layer.models.users import RoleEnum
+from app.infrastructure.database.models.users import RoleEnum
 
 
 class TokenType(str, Enum):

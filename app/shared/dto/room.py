@@ -1,55 +1,82 @@
 from datetime import datetime
+from dataclasses import dataclass
 from uuid import UUID
-from pydantic import BaseModel
-from app.data_layer.models import RoomRole
-from typing import TYPE_CHECKING
-from app.shared.dto.chat import ChatDtoSave
+from app.shared.dto.base import _UnsetType, UNSET, BaseSaveDTO, BaseUpdateDTO
+from app.shared.dto.enums import ChatRole
 
 
-class RoomMemberDtoSave(BaseModel):
-    """DTO для сохранения участника комнаты"""
-    room_id: UUID
-    user_id: str
-    role: RoomRole = RoomRole.MEMBER
-
-
-class RoomDtoSave(BaseModel):
-    """DTO для сохранения комнаты"""
-    id: UUID
-    name: str
-    description: str = ''
-    avatar_url: str | None = None
-    owner_id: str
-    is_private: bool = True
-    members: list[RoomMemberDtoSave]
-    chats: list[ChatDtoSave]
-
-
-class RoomDtoUpdate(BaseModel):
-    """DTO для обновления комнаты"""
-    name: str | None = None
+@dataclass(frozen=True, slots=True)
+class RoomSaveDTO(BaseSaveDTO):
+    """DTO для сохранения комнаты в БД."""
+    chat_id: UUID
+    title: str
+    max_users: int = 30
     description: str | None = None
     avatar_url: str | None = None
-    owner_id: str | None = None
-    is_private: bool | None = None
 
 
-class RoomDtoGet(BaseModel):
-    """DTO для получения комнаты"""
-    id: UUID
-    name: str
+@dataclass(frozen=True, slots=True)
+class RoomUpdateDTO(BaseUpdateDTO):
+    """DTO для обновления комнаты в БД."""
+    title: str | None | _UnsetType = UNSET
+    max_users: int | None | _UnsetType = UNSET
+    description: str | None | _UnsetType = UNSET
+    avatar_url: str | None | _UnsetType = UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class RoomDTO:
+    """DTO для получения информации о комнате"""
+    chat_id: UUID
+    title: str
     description: str | None
     avatar_url: str | None
+    max_users: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class TopRoomsByMemberDTO:
+    """DTO для получения информации о топ комнат по кол-ву участников."""
+    chat_id: UUID
+    members_count: int
     owner_id: str
-    is_private: bool
-    created_at: datetime
-    updated_at: datetime
 
 
-class RoomMemberDtoGet(BaseModel):
-    """DTO для получения участника комнаты"""
-    room_id: UUID
+@dataclass(frozen=True, slots=True)
+class RoomUserMemberDTO:
+    """DTO для получения информации о комнате, в которых состоит выбранный пользователь"""
+    chat_id: UUID
+    title: str
+    description: str | None
+    avatar_url: str | None
     user_id: str
-    role: RoomRole
+    role: ChatRole
+    members_count: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class RoomDetailsDTO:
+    """DTO для получения детальной информации о комнате и счетчик участников, админов"""
+    chat_id: UUID
+    title: str
+    max_users: int
+    description: str | None
+    avatar_url: str | None
+    owner_id: str | None
+    members_count: int
+    admins_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class GenerateInviteToken:
+    """DTO для создания url токена для вступления в группу."""
+    actor_id: str
+    room_id: UUID
+    hours: int
+    max_uses: int | None = None

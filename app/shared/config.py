@@ -77,6 +77,16 @@ class SmtpConfig(BaseModel):
     port: int
 
 
+class CacheConfig(BaseModel):
+    """Конфиг для кеша"""
+    max_connection: int = 100
+    presence: int = 60
+    user: int = 1800
+    chat: int = 30
+    room: int = 3600
+    verify_code: int = 60
+
+
 class BaseConfig(BaseSettings):
     """Базовый конфиг для хранения настроек проекта"""
     postgres: PostgresqlSettings
@@ -87,7 +97,9 @@ class BaseConfig(BaseSettings):
     log_info: LogLevelInfo
     mongodb: MongoDb
     smtp: SmtpConfig
-    app_key: bytes
+    cache: CacheConfig
+    app_token: bytes
+    app_key: str
     mode: AppMode = AppMode.DEV
 
     @field_validator('upload_file_path')

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Auth — Socket Chat</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 2px 12px rgba(0,0,0,.08);
+        }
+        h1 { margin-bottom: 8px; font-size: 24px; }
+        .subtitle { color: #65676b; font-size: 14px; margin-bottom: 24px; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: #e4e6eb;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all .2s;
+        }
+        .tab.active { background: #0084ff; color: #fff; }
+        .form { display: none; flex-direction: column; gap: 12px; }
+        .form.active { display: flex; }
+        label { font-size: 13px; color: #65676b; margin-bottom: 4px; display: block; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color .2s;
+        }
+        input:focus { outline: none; border-color: #0084ff; }
+        button[type="submit"] {
+            padding: 12px;
+            border: none;
+            background: #0084ff;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 8px;
+            transition: background .2s;
+        }
+        button[type="submit"]:hover { background: #0073e6; }
+        button[type="submit"]:disabled { background: #ccc; cursor: not-allowed; }
+        .error {
+            color: #e41e3f;
+            font-size: 13px;
+            min-height: 18px;
+            white-space: pre-wrap; /* Чтобы ошибки валидации переносились на новую строку */
+            line-height: 1.4;
+        }
+        .success {
+            color: #31a24c;
+            font-size: 14px;
+            padding: 12px;
+            background: #e7f7ea;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .hidden { display: none !important; }
+        .code-hint {
+            font-size: 13px;
+            color: #65676b;
+            margin-bottom: 8px;
+        }
+        .code-hint strong { color: #0084ff; font-size: 16px; }
+        .link {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #0084ff;
+            cursor: pointer;
+        }
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+            padding: 10px;
+            background: #f0f2f5;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle-container input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #0084ff;
+        }
+        .toggle-label {
+            font-size: 13px;
+            color: #333;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .toggle-hint {
+            font-size: 11px;
+            color: #888;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Socket Chat</h1>
+    <p class="subtitle">Войдите или создайте аккаунт</p>
+
+    <div class="tabs">
+        <button type="button" id="tab-login" class="tab active" onclick="switchTab('login')">Вход</button>
+        <button type="button" id="tab-register" class="tab" onclick="switchTab('register')">Регистрация</button>
+    </div>
+
+    <!-- Вход -->
+    <form class="form active" id="form-login" onsubmit="handleLogin(event)">
+        <div>
+            <label>User ID</label>
+            <input id="login-user-id" placeholder="Введите user_id" required>
+        </div>
+        <div>
+            <label>Пароль</label>
+            <input id="login-password" type="password" placeholder="Пароль" required>
+        </div>
+        <div class="error" id="login-error"></div>
+
+        <!-- Переключатель режима -->
+        <div class="toggle-container" onclick="document.getElementById('debug-mode').click()">
+            <input type="checkbox" id="debug-mode" onclick="event.stopPropagation()">
+            <div>
+                <span class="toggle-label">Режим разработчика</span>
+                <span class="toggle-hint">Код придет в ответе (без почты)</span>
+            </div>
+        </div>
+
+        <button type="submit" id="login-btn">Войти</button>
+    </form>
+
+    <!-- Регистрация -->
+    <form class="form" id="form-register" onsubmit="handleRegister(event)">
+        <div>
+            <label>User ID</label>
+            <input id="register-user-id" placeholder="Уникальный user_id" required>
+        </div>
+        <div>
+            <label>Имя</label>
+            <input id="register-display-name" placeholder="Ваше имя" required>
+        </div>
+        <div>
+            <label>Email</label>
+            <input id="register-email" type="email" placeholder="you@example.com" required>
+        </div>
+        <div>
+            <label>Пароль</label>
+            <input id="register-password" type="password" placeholder="Минимум 8 символов" required minlength="8">
+        </div>
+        <div class="error" id="register-error"></div>
+        <button type="submit" id="register-btn">Зарегистрироваться</button>
+    </form>
+
+    <!-- Код -->
+    <form class="form" id="form-code" onsubmit="handleVerifyCode(event)">
+        <p class="success" id="code-message"></p>
+        <div>
+            <label>Код подтверждения</label>
+            <input id="code-input" type="number" placeholder="Введите код" required>
+        </div>
+        <input type="hidden" id="code-user-id">
+        <div class="error" id="code-error"></div>
+        <button type="submit" id="code-btn">Подтвердить</button>
+        <div class="link" onclick="switchTab('login')">← Назад</div>
+    </form>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8003/api/v1';
+
+function switchTab(name) {
+    document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    const form = document.getElementById(`form-${name}`);
+    if (form) form.classList.add('active');
+    const tab = document.getElementById(`tab-${name}`);
+    if (tab) tab.classList.add('active');
+
+    // Очищаем ошибки при переключении
+    document.querySelectorAll('.error').forEach(e => e.textContent = '');
+}
+
+// УЛУЧШЕННЫЙ ПАРСИНГ ОШИБОК
+async function parseError(res) {
+    try {
+        const data = await res.json();
+
+        // 1. Ошибки валидации Pydantic (массив объектов)
+        if (data.detail && Array.isArray(data.detail)) {
+            return data.detail.map(e => {
+                const field = e.loc.filter(l => l !== 'body').join('.');
+                return field ? `${field}: ${e.msg}` : e.msg;
+            }).join('\n');
+        }
+
+        // 2. Обычный текст ошибки (строка)
+        if (data.detail) {
+            return data.detail;
+        }
+
+        return data.message || JSON.stringify(data);
+    } catch {
+        return `Ошибка сервера (HTTP ${res.status})`;
+    }
+}
+
+// ХЕЛПЕР ДЛЯ ОБРАБОТКИ СЕТЕВЫХ ОШИБОК
+function handleCatchError(err, errorEl) {
+    if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
+        errorEl.textContent = 'Не удалось подключиться к серверу. Проверьте интернет.';
+    } else {
+        errorEl.textContent = err.message || 'Произошла неизвестная ошибка';
+    }
+}
+
+function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+        btn.disabled = true;
+        btn.dataset.original = btn.textContent;
+        btn.innerHTML = `<span class="spinner"></span>Подождите...`;
+    } else {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.original || 'Отправить';
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('register-error');
+    errEl.textContent = '';
+
+    const body = {
+        user_id: document.getElementById('register-user-id').value.trim(),
+        display_name: document.getElementById('register-display-name').value.trim(),
+        email: document.getElementById('register-email').value.trim(),
+        password: document.getElementById('register-password').value,
+    };
+
+    setLoading('register-btn', true);
+
+    try {
+        const res = await fetch(`${API}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!res.ok) throw new Error(await parseError(res));
+
+        switchTab('code');
+        document.getElementById('code-user-id').value = body.user_id;
+        document.getElementById('code-message').textContent = 'Код отправлен на вашу почту';
+
+    } catch (err) {
+        handleCatchError(err, errEl);
+    } finally {
+        setLoading('register-btn', false);
+    }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+
+    const body = {
+        user_id: document.getElementById('login-user-id').value.trim(),
+        password: document.getElementById('login-password').value,
+    };
+
+    const isDebug = document.getElementById('debug-mode').checked;
+    const endpoint = isDebug ? `${API}/auth/debug/login` : `${API}/auth/login`;
+
+    setLoading('login-btn', true);
+
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!res.ok) throw new Error(await parseError(res));
+
+        const data = await res.json();
+
+        // Если это Debug-режим, сервер вернул код (LoginDtoResponse)
+        if (isDebug) {
+            if (data.code) {
+                // Автоматически отправляем этот код на верификацию
+                const verifyRes = await fetch(`${API}/auth/verify-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: body.user_id, code: data.code }),
+                });
+
+                if (!verifyRes.ok) throw new Error(await parseError(verifyRes));
+
+                const tokens = await verifyRes.json();
+
+                sessionStorage.setItem('access_token', tokens.access_token);
+                sessionStorage.setItem('refresh_token', tokens.refresh_token);
+                sessionStorage.setItem('user_id', body.user_id);
+
+                window.location.href = '/static/main.html';
+                return;
+            } else {
+                throw new Error('Сервер не вернул код для входа.');
+            }
+        }
+
+        // Если обычный режим, переходим на ввод кода
+        switchTab('code');
+        document.getElementById('code-user-id').value = body.user_id;
+        document.getElementById('code-message').textContent = 'Код отправлен на вашу почту';
+
+    } catch (err) {
+        handleCatchError(err, errEl);
+    } finally {
+        setLoading('login-btn', false);
+    }
+}
+
+async function handleVerifyCode(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('code-error');
+    errEl.textContent = '';
+
+    const userId = document.getElementById('code-user-id').value;
+    const code = parseInt(document.getElementById('code-input').value, 10);
+
+    setLoading('code-btn', true);
+
+    try {
+        const res = await fetch(`${API}/auth/verify-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, code }),
+        });
+
+        if (!res.ok) throw new Error(await parseError(res));
+
+        const data = await res.json();
+
+        sessionStorage.setItem('access_token', data.access_token);
+        sessionStorage.setItem('refresh_token', data.refresh_token);
+        sessionStorage.setItem('user_id', userId);
+
+        window.location.href = '/static/main.html';
+    } catch (err) {
+        handleCatchError(err, errEl);
+    } finally {
+        setLoading('code-btn', false);
+    }
+}
+
+if (sessionStorage.getItem('access_token')) {
+    window.location.href = '/static/main.html';
+}
+</script>
+</body>
+</html>
