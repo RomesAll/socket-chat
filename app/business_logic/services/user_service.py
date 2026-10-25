@@ -46,6 +46,10 @@ class UserService(LogMixin):
             hashed_password=user_orm.password,
         )
 
+    async def get_admins(self) -> list[UserDtoGet]:
+        """Получить список админов"""
+        return [self._mapper.to_dto(user) for user in await self._uow.user_repo.get_admins()]
+
     async def get(self, user_id: str) -> UserDtoGet:
         """Получить информацию о пользователе по ID."""
         cached = await self._cache.get(user_id)

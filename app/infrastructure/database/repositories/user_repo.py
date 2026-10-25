@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Sequence
 from sqlalchemy import select, func, or_
 from app.infrastructure.database.exceptions import RecordNotFound
 from app.infrastructure.database.repositories.base.base_repo import (
@@ -57,6 +58,14 @@ class UserRepository(
         result = await self.session.execute(stmt)
         return {row.domain: row.count for row in result.all()}
 
+    async def get_admins(self) -> Sequence[User]:
+        """Получить список админов"""
+        stmt = (
+            select(self.MODEL)
+            .where(self.MODEL.role.in_([RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN]))
+        )
+        result = (await self.session.scalars(stmt)).all()
+        return result
 
     async def get_user_by_email(self, email: str) -> User:
         """
