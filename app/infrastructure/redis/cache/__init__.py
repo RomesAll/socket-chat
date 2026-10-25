@@ -5,7 +5,7 @@ from .unread_cache import UnreadCache
 from .user_cache import UserCache
 from .chat_cache import ChatCache
 
-__version__ = 'v0.3.0'
+__version__ = 'v1.0.0'
 __author__ = 'RomesAll'
 __all__ = [
     'ChatMessageCache',

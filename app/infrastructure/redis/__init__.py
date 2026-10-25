@@ -5,7 +5,7 @@ from .verify_code_storage import VerifyCodeStorage
 from .cache import UserCache, UnreadCache, RoomCache, ChatMessageCache, PresenceCache, ChatCache
 
 
-__version__ = 'v0.3.0'
+__version__ = 'v1.0.0'
 __author__ = 'RomesAll'
 __all__ = [
     'RedisClient',

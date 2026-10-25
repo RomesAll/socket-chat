@@ -28,5 +28,5 @@ def api_register(app: FastAPI):
     app.include_router(audit_router, prefix=api_v1)
 
 
-__version__ = 'v0.3.0'
+__version__ = 'v1.0.0'
 __author__ = 'RomesAll'

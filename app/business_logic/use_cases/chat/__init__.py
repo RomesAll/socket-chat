@@ -5,7 +5,7 @@ from .remove_chat_member import RemoveChatMemberUseCase
 from .transfer_chat_ownership import TransferChatOwnershipUseCase
 
 __author__ = 'RomesAll'
-__version__ = 'v0.3.0'
+__version__ = 'v1.0.0'
 __all__ = [
     'ChangeChatMemberRoleUseCase',
     'GenerateInviteLinkUseCase',

@@ -4,7 +4,7 @@ from .mark_messages_read import MarkMessagesReadUseCase
 from .send_message import SendMessageUseCase
 
 __author__ = 'RomesAll'
-__version__ = 'v0.3.0'
+__version__ = 'v1.0.0'
 __all__ = [
     'DeleteMessageUseCase',
     'GetChatHistoryUseCase',
