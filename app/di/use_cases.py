@@ -18,6 +18,7 @@ from app.business_logic.use_cases.auth import (
     LogoutAllUseCase,
 )
 from app.business_logic.use_cases.auth.revoke_all_user_tokens import RevokeAllUserTokens
+from app.business_logic.use_cases.chat.delete_chat import DeleteChatUseCase
 from app.business_logic.use_cases.chat.get_group_chats import GetGroupChatsUseCase
 from app.business_logic.use_cases.chat.get_private_chats import GetPrivateChatsUseCase
 from app.business_logic.use_cases.message.get_file_path import GetFilePathUseCase
@@ -446,6 +447,7 @@ def get_disconnect_ws_use_case(
     manager=Depends(get_ws_manager),
     ws_broker=Depends(get_ws_broker),
     presence=Depends(get_presence_cache),
+    user_service = Depends(get_user_service)
 ) -> DisconnectWebSocketUseCase:
     return DisconnectWebSocketUseCase(
         chat_service=chat_service,
@@ -453,6 +455,19 @@ def get_disconnect_ws_use_case(
         manager=manager,
         ws_broker=ws_broker,
         presence=presence,
+        user_service=user_service
+    )
+
+
+def get_delete_chat_use_case(
+    chat_service: ChatService = Depends(get_chat_service),
+    ws_broker: WSBroker = Depends(get_ws_broker),
+    uow: UnitOfWork = Depends(get_uow)
+) -> DeleteChatUseCase:
+    return DeleteChatUseCase(
+        chat_service=chat_service,
+        ws_broker=ws_broker,
+        uow=uow
     )
 
 
