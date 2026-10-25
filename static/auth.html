@@ -63,7 +63,13 @@
         }
         button[type="submit"]:hover { background: #0073e6; }
         button[type="submit"]:disabled { background: #ccc; cursor: not-allowed; }
-        .error { color: #e41e3f; font-size: 13px; min-height: 18px; }
+        .error {
+            color: #e41e3f;
+            font-size: 13px;
+            min-height: 18px;
+            white-space: pre-wrap; /* Чтобы ошибки валидации переносились на новую строку */
+            line-height: 1.4;
+        }
         .success {
             color: #31a24c;
             font-size: 14px;
@@ -99,7 +105,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Стили для переключателя */
         .toggle-container {
             display: flex;
             align-items: center;
@@ -152,7 +157,7 @@
         </div>
         <div class="error" id="login-error"></div>
 
-        <!-- НОВЫЙ БЛОК: Переключатель режима -->
+        <!-- Переключатель режима -->
         <div class="toggle-container" onclick="document.getElementById('debug-mode').click()">
             <input type="checkbox" id="debug-mode" onclick="event.stopPropagation()">
             <div>
@@ -210,17 +215,41 @@ function switchTab(name) {
     if (form) form.classList.add('active');
     const tab = document.getElementById(`tab-${name}`);
     if (tab) tab.classList.add('active');
+
+    // Очищаем ошибки при переключении
+    document.querySelectorAll('.error').forEach(e => e.textContent = '');
 }
 
+// УЛУЧШЕННЫЙ ПАРСИНГ ОШИБОК
 async function parseError(res) {
     try {
         const data = await res.json();
-        if (Array.isArray(data.detail)) {
-            return data.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join(', ');
+
+        // 1. Ошибки валидации Pydantic (массив объектов)
+        if (data.detail && Array.isArray(data.detail)) {
+            return data.detail.map(e => {
+                const field = e.loc.filter(l => l !== 'body').join('.');
+                return field ? `${field}: ${e.msg}` : e.msg;
+            }).join('\n');
         }
-        return data.detail || data.message || JSON.stringify(data);
+
+        // 2. Обычный текст ошибки (строка)
+        if (data.detail) {
+            return data.detail;
+        }
+
+        return data.message || JSON.stringify(data);
     } catch {
-        return await res.text() || `HTTP ${res.status}`;
+        return `Ошибка сервера (HTTP ${res.status})`;
+    }
+}
+
+// ХЕЛПЕР ДЛЯ ОБРАБОТКИ СЕТЕВЫХ ОШИБОК
+function handleCatchError(err, errorEl) {
+    if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
+        errorEl.textContent = 'Не удалось подключиться к серверу. Проверьте интернет.';
+    } else {
+        errorEl.textContent = err.message || 'Произошла неизвестная ошибка';
     }
 }
 
@@ -265,7 +294,7 @@ async function handleRegister(e) {
         document.getElementById('code-message').textContent = 'Код отправлен на вашу почту';
 
     } catch (err) {
-        errEl.textContent = err.message || 'Ошибка регистрации';
+        handleCatchError(err, errEl);
     } finally {
         setLoading('register-btn', false);
     }
@@ -311,9 +340,9 @@ async function handleLogin(e) {
 
                 const tokens = await verifyRes.json();
 
-                localStorage.setItem('access_token', tokens.access_token);
-                localStorage.setItem('refresh_token', tokens.refresh_token);
-                localStorage.setItem('user_id', body.user_id);
+                sessionStorage.setItem('access_token', tokens.access_token);
+                sessionStorage.setItem('refresh_token', tokens.refresh_token);
+                sessionStorage.setItem('user_id', body.user_id);
 
                 window.location.href = '/static/main.html';
                 return;
@@ -328,7 +357,7 @@ async function handleLogin(e) {
         document.getElementById('code-message').textContent = 'Код отправлен на вашу почту';
 
     } catch (err) {
-        errEl.textContent = err.message || 'Ошибка входа';
+        handleCatchError(err, errEl);
     } finally {
         setLoading('login-btn', false);
     }
@@ -355,19 +384,19 @@ async function handleVerifyCode(e) {
 
         const data = await res.json();
 
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        localStorage.setItem('user_id', userId);
+        sessionStorage.setItem('access_token', data.access_token);
+        sessionStorage.setItem('refresh_token', data.refresh_token);
+        sessionStorage.setItem('user_id', userId);
 
         window.location.href = '/static/main.html';
     } catch (err) {
-        errEl.textContent = err.message || 'Неверный код';
+        handleCatchError(err, errEl);
     } finally {
         setLoading('code-btn', false);
     }
 }
 
-if (localStorage.getItem('access_token')) {
+if (sessionStorage.getItem('access_token')) {
     window.location.href = '/static/main.html';
 }
 </script>

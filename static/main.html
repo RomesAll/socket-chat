@@ -246,6 +246,10 @@
             position: relative; background: #fff; border: 1px solid #ddd; border-radius: 8px;
             padding: 6px 10px; font-size: 13px; display: flex; align-items: center; gap: 8px; max-width: 200px;
         }
+        #delete-chat-btn:hover {
+            background: #ffe6e6;
+            color: #e41e3f;
+        }
         .attachment-item img { width: 30px; height: 30px; object-fit: cover; border-radius: 4px; }
         .attachment-item .remove-file { cursor: pointer; color: #e41e3f; font-weight: bold; margin-left: auto; padding: 0 4px; }
         .attachment-item .file-icon { font-size: 20px; }
@@ -334,6 +338,80 @@
         .member-role { font-size: 12px; color: #65676b; }
         .kick-btn { cursor: pointer; font-size: 16px; color: #e41e3f; opacity: 0.5; transition: opacity 0.2s; padding: 4px; }
         .kick-btn:hover { opacity: 1; }
+
+                @media (max-width: 768px) {
+            body {
+                display: block;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 100vh;
+                border-right: none;
+                display: flex;
+            }
+
+            .main {
+                width: 100%;
+                height: 100vh;
+                display: none;
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                z-index: 100;
+            }
+
+            body.mobile-chat-open .sidebar {
+                display: none;
+            }
+            body.mobile-chat-open .main {
+                display: flex;
+            }
+
+            /* Стили ТОЛЬКО для кнопки "Назад" (крестик) */
+            #close-chat-btn {
+                display: flex; /* Убрали !important */
+                width: 40px;
+                height: 40px;
+                background: #f0f2f5;
+                border-radius: 50%;
+                color: #333;
+                margin-right: 8px;
+            }
+            /* Чтобы при скрытии через .hidden кнопка все равно исчезала */
+            #close-chat-btn.hidden {
+                display: none !important;
+            }
+
+            #close-chat-btn svg {
+                width: 24px;
+                height: 24px;
+            }
+
+            /* Кнопка удаления на мобилке — просто круг, без принудительного показа */
+            #delete-chat-btn {
+                width: 40px;
+                height: 40px;
+                background: #f0f2f5;
+                border-radius: 50%;
+                color: #e41e3f;
+            }
+            #delete-chat-btn.hidden {
+                display: none !important;
+            }
+
+            .main-header {
+                padding: 10px 12px;
+            }
+
+            .messages {
+                padding: 12px;
+            }
+
+            .message-wrapper .msg-actions {
+                top: -15px;
+            }
+        }
+
     </style>
     <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 </head>
@@ -391,6 +469,9 @@
             <button id="invite-link-btn" class="action-btn hidden" onclick="openInviteModal()">
                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
                 Пригласить
+            </button>
+            <button id="delete-chat-btn" class="close-chat-btn hidden" onclick="deleteCurrentChat()" title="Удалить чат" style="color: #e41e3f;">
+                <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             </button>
             <button id="close-chat-btn" class="close-chat-btn hidden" onclick="closeChat()" title="Закрыть чат">
                 <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -625,7 +706,7 @@ let isLoggingOut = false;
 let wsRetryCount = 0;
 const MAX_WS_RETRIES = 5;
 
-let pinnedChatIds = JSON.parse(localStorage.getItem('pinned_chats') || '[]');
+let pinnedChatIds = JSON.parse(sessionStorage.getItem('pinned_chats') || '[]');
 
 function togglePinChat(chatId, event) {
     if (event) {
@@ -638,16 +719,38 @@ function togglePinChat(chatId, event) {
         pinnedChatIds.push(chatId);
     }
 
-    localStorage.setItem('pinned_chats', JSON.stringify(pinnedChatIds));
+    sessionStorage.setItem('pinned_chats', JSON.stringify(pinnedChatIds));
     renderChats(allChats);
 }
 
 let statusTargetUserId = null;
 
-const userId = localStorage.getItem('user_id');
+const userId = sessionStorage.getItem('user_id');
 
-if (!localStorage.getItem('access_token')) {
+if (!sessionStorage.getItem('access_token')) {
     window.location.replace('/static/auth.html');
+}
+
+async function fetchFileBlobWithRetry(url, mimeType, maxRetries = 2, delayMs = 800) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                const b = await res.blob();
+                return new Blob([b], { type: mimeType }); // Принудительно ставим MIME
+            }
+            // Если 404 (еще нет в БД) или 500 (ошибка БД), ждем и пробуем снова
+            if (res.status === 404 || res.status === 500) {
+                console.warn(`Файл не готов (статус ${res.status}), попытка ${i + 1} из ${maxRetries}...`);
+                await new Promise(r => setTimeout(r, delayMs));
+                continue;
+            }
+            throw new Error(`HTTP ${res.status}`);
+        } catch (err) {
+            if (i === maxRetries - 1) throw err;
+            await new Promise(r => setTimeout(r, delayMs));
+        }
+    }
 }
 
 function getAvatarInfo(name, id = null) {
@@ -902,36 +1005,44 @@ async function openMembersModal() {
         }
 
         membersList.innerHTML = members.map(m => {
-            // Бэкенд теперь отдает {id, display_name, role}
             const uid = m.id || m.user_id;
             const uname = m.display_name || m.name;
-            const role = m.role; // <-- СОХРАНЯЕМ РОЛЬ
+            const role = m.role;
 
             userCache[uid] = uname;
 
             const av = getAvatarInfo(uname, uid);
             const isMe = String(uid) === String(userId);
 
-            // Определяем, может ли текущий пользователь кикнуть или изменить роль
-            // (Предполагаем, что если isOwner, то может)
-            const canKick = (isOwner && !isMe) || (!isOwner && isMe);
-            const kickBtn = canKick ? `<span class="kick-btn" onclick="kickMember('${uid}')">🗑️</span>` : '';
+            // Логика прав: кто кого может кикать/менять роль
+            const myRole = window.currentUserRole;
+            let canManage = false;
 
-            // Кнопка смены роли (только для владельца, и не для себя)
-            const changeRoleBtn = (isOwner && !isMe)
-                ? `<span class="role-btn" onclick="openChangeRole('${uid}', '${uname}')">👑</span>`
-                : '';
+            // Владелец (3) может управлять всеми, кроме себя
+            if (myRole === 3 && role !== 3) canManage = true;
+            // Админ (2) может управлять только участниками (1), но не админами/владельцем
+            if (myRole === 2 && role === 1) canManage = true;
 
-            // Кнопка выхода (только для себя)
-            const leaveBtn = isMe
-                ? `<span class="kick-btn" title="Выйти из комнаты" onclick="leaveRoom()">🚪</span>`
-                : '';
-
-            // Вычисляем текст роли ДО формирования HTML
+            // Вычисляем текст роли
             let roleText = 'Неизвестно';
             if (role === 1 || role === 'MEMBER') roleText = 'Участник';
             if (role === 2 || role === 'ADMIN') roleText = 'Админ';
             if (role === 3 || role === 'OWNER') roleText = 'Владелец';
+
+            // Кнопка смены роли (только владелец и не для себя)
+            const changeRoleBtn = (myRole === 3 && !isMe)
+                ? `<span class="role-btn" onclick="openChangeRole('${uid}', '${uname}')" title="Сменить роль">👑</span>`
+                : '';
+
+            // Кнопка "Выйти" (только для себя)
+            const leaveBtn = isMe
+                ? `<span class="kick-btn" title="Выйти из комнаты" onclick="leaveRoom()">🚪</span>`
+                : '';
+
+            // Кнопка "Кикнуть" (если есть права и это не вы)
+            const kickBtn = (canManage && !isMe)
+                ? `<span class="kick-btn" onclick="kickMember('${uid}')" title="Удалить участника">🗑️</span>`
+                : '';
 
             return `
             <div class="member-item">
@@ -1032,7 +1143,7 @@ window.fetch = async function(...args) {
     if (typeof resource === 'string' && resource.includes('/auth/refresh')) return originalFetch.apply(this, args);
 
     const headers = new Headers(config.headers || {});
-    headers.set('Authorization', `Bearer ${localStorage.getItem('access_token')}`);
+    headers.set('Authorization', `Bearer ${sessionStorage.getItem('access_token')}`);
     config.headers = headers;
 
     let response = await originalFetch(resource, config);
@@ -1042,7 +1153,7 @@ window.fetch = async function(...args) {
             return new Promise((resolve) => {
                 subscribeTokenRefresh(() => {
                     const newHeaders = new Headers(config.headers || {});
-                    newHeaders.set('Authorization', `Bearer ${localStorage.getItem('access_token')}`);
+                    newHeaders.set('Authorization', `Bearer ${sessionStorage.getItem('access_token')}`);
                     resolve(originalFetch(resource, { ...config, headers: newHeaders }));
                 });
             });
@@ -1051,7 +1162,7 @@ window.fetch = async function(...args) {
         isRefreshing = true;
 
         try {
-            const refreshToken = localStorage.getItem('refresh_token');
+            const refreshToken = sessionStorage.getItem('refresh_token');
             if (!refreshToken) throw new Error('No refresh token');
 
             const refreshRes = await originalFetch(`${API_BASE}/auth/refresh`, {
@@ -1062,8 +1173,8 @@ window.fetch = async function(...args) {
             if (!refreshRes.ok) throw new Error('Refresh failed');
 
             const data = await refreshRes.json();
-            localStorage.setItem('access_token', data.access_token);
-            localStorage.setItem('refresh_token', data.refresh_token);
+            sessionStorage.setItem('access_token', data.access_token);
+            sessionStorage.setItem('refresh_token', data.refresh_token);
 
             onRefreshed(data.access_token);
 
@@ -1097,7 +1208,7 @@ function logout() {
     if (wsReconnectTimeout) { clearTimeout(wsReconnectTimeout); wsReconnectTimeout = null; }
     if (ws) { ws.onclose = null; ws.onerror = null; ws.onmessage = null; try { ws.close(); } catch(e) {} ws = null; }
     stopStatusPolling();
-    localStorage.clear();
+    sessionStorage.clear();
     setTimeout(() => window.location.replace('/static/auth.html'), 0);
 }
 
@@ -1146,7 +1257,7 @@ async function loadChats() {
             // Если его еще нет в закрепленных
             if (!pinnedChatIds.includes(favId)) {
                 pinnedChatIds.push(favId);
-                localStorage.setItem('pinned_chats', JSON.stringify(pinnedChatIds));
+                sessionStorage.setItem('pinned_chats', JSON.stringify(pinnedChatIds));
             }
         }
 
@@ -1229,6 +1340,7 @@ function renderChats(chats) {
 }
 
 async function openChat(chatId, title) {
+    document.body.classList.add('mobile-chat-open');
     const searchInput = document.getElementById('chat-search-input');
     if (searchInput) searchInput.value = '';
     if (isLoggingOut) return;
@@ -1273,9 +1385,17 @@ async function openChat(chatId, title) {
 
     const inviteBtn = document.getElementById('invite-link-btn');
     const membersBtn = document.getElementById('members-btn');
+    const deleteBtn = document.getElementById('delete-chat-btn');
+
     if (isRoom) {
         membersBtn.classList.remove('hidden');
-        if (isOwner) inviteBtn.classList.remove('hidden'); else inviteBtn.classList.add('hidden');
+        if (isOwner) {
+            deleteBtn.classList.remove('hidden');
+            inviteBtn.classList.remove('hidden');
+        } else {
+            deleteBtn.classList.add('hidden');
+            inviteBtn.classList.add('hidden');
+        }
         // Определяем свою роль в комнате
         window.currentUserRole = null;
         if (isRoom) {
@@ -1296,7 +1416,15 @@ async function openChat(chatId, title) {
                 }
             } catch(e) {}
         }
-    } else { inviteBtn.classList.add('hidden'); membersBtn.classList.add('hidden'); }
+    } else {
+        if (chatInfo && chatInfo.type === 'FAVORITES') {
+            deleteBtn.classList.add('hidden');
+        } else {
+            deleteBtn.classList.remove('hidden');
+        }
+        inviteBtn.classList.add('hidden');
+        membersBtn.classList.add('hidden');
+    }
 
     document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
 
@@ -1370,6 +1498,8 @@ async function openChat(chatId, title) {
 }
 
 function closeChat() {
+    document.body.classList.remove('mobile-chat-open');
+    currentChatId = null;
     currentChatId = null; currentRoomId = null; currentRecipientId = null; isOwner = false; cancelReply();
     stopStatusPolling();
     document.getElementById('main-header-title').textContent = 'Выберите чат';
@@ -1380,6 +1510,7 @@ function closeChat() {
     document.getElementById('members-btn').classList.add('hidden');
     document.getElementById('attachment-preview').classList.add('hidden');
     document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('delete-chat-btn').classList.add('hidden');
 }
 
 let lastMessageDate = null;
@@ -1459,6 +1590,7 @@ function buildMessageNode(msg, prevDateStr) {
     const div = document.createElement('div');
     div.className = `message ${isOwn ? 'own' : 'other'}`;
 
+    // --- БЛОК ОТВЕТА (REPLY) ---
     if (msg.reply_to) {
         let replyAuthor = 'Ответ';
         if (msg.reply_to.sender_id) {
@@ -1482,6 +1614,7 @@ function buildMessageNode(msg, prevDateStr) {
         div.appendChild(replyDiv);
     }
 
+    // --- БЛОК ПЕРЕСЛАННОГО СООБЩЕНИЯ (FORWARD) ---
     if (msg.forwarded_from || msg.forwarded_from_message_id) {
         let fwdAuthor = 'Кто-то';
         const fwdId = msg.forwarded_from ? msg.forwarded_from.forwarded_from_user_id : msg.forwarded_from_user_id;
@@ -1511,45 +1644,52 @@ function buildMessageNode(msg, prevDateStr) {
                     if (file.file_name.match(/\.(jpg|jpeg|png|gif|webp)$/i)) mime = 'image/jpeg';
                     else if (file.file_name.match(/\.webm$/i)) mime = 'audio/webm';
                 }
+
                 if (mime.startsWith('image/')) {
                     const img = document.createElement('img');
                     img.className = 'message-image';
                     img.style.marginTop = '8px';
                     img.alt = file.file_name;
-                    fetch(`${API_BASE}/messages/chats/${chatIdToDownload}/downloads/${file.id}`)
-                        .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
-                        .then(b => {
-                            img.src = URL.createObjectURL(b);
+
+                    fetchFileBlobWithRetry(`${API_BASE}/messages/chats/${chatIdToDownload}/downloads/${file.id}`, mime)
+                        .then(correctBlob => {
+                            img.src = URL.createObjectURL(correctBlob);
                             img.onclick = () => window.open(img.src, '_blank');
                             img.onload = autoScrollIfNearBottom;
                         })
-                        .catch(() => {
+                        .catch((err) => {
+                            console.error(`Ошибка загрузки пересланной картинки ${file.file_name}:`, err);
                             const fileBtn = document.createElement('div');
                             fileBtn.className = 'file-link';
                             fileBtn.style.marginTop = '8px';
-                            fileBtn.innerHTML = `📎 ${file.file_name}`;
+                            fileBtn.innerHTML = `⚠️ ${file.file_name} (ошибка)`;
                             fileBtn.onclick = () => downloadFile(chatIdToDownload, file.id, file.file_name);
-                            fwdDiv.appendChild(fileBtn);
+                            img.replaceWith(fileBtn);
                         });
                     fwdDiv.appendChild(img);
+
                 } else if (mime.startsWith('audio/')) {
                     const audio = document.createElement('audio');
                     audio.controls = true;
                     audio.style.marginTop = '8px';
-                    fetch(`${API_BASE}/messages/chats/${chatIdToDownload}/downloads/${file.id}`).then(r => r.blob()).then(b => {
-                        audio.src = URL.createObjectURL(b);
-                        audio.onloadedmetadata = autoScrollIfNearBottom;
-                    }).catch(() => {});
+                    fetchFileBlobWithRetry(`${API_BASE}/messages/chats/${chatIdToDownload}/downloads/${file.id}`, mime)
+                        .then(correctBlob => {
+                            audio.src = URL.createObjectURL(correctBlob);
+                            audio.onloadedmetadata = autoScrollIfNearBottom;
+                        }).catch(err => console.error('Ошибка аудио (forward):', err));
                     fwdDiv.appendChild(audio);
+
                 } else if (mime.startsWith('video/')) {
                     const video = document.createElement('video');
                     video.controls = true;
                     video.style.marginTop = '8px';
-                    fetch(`${API_BASE}/messages/chats/${chatIdToDownload}/downloads/${file.id}`).then(r => r.blob()).then(b => {
-                        video.src = URL.createObjectURL(b);
-                        video.onloadedmetadata = autoScrollIfNearBottom;
-                    }).catch(() => {});
+                    fetchFileBlobWithRetry(`${API_BASE}/messages/chats/${chatIdToDownload}/downloads/${file.id}`, mime)
+                        .then(correctBlob => {
+                            video.src = URL.createObjectURL(correctBlob);
+                            video.onloadedmetadata = autoScrollIfNearBottom;
+                        }).catch(err => console.error('Ошибка видео (forward):', err));
                     fwdDiv.appendChild(video);
+
                 } else {
                     const fileBtn = document.createElement('div');
                     fileBtn.className = 'file-link';
@@ -1563,6 +1703,7 @@ function buildMessageNode(msg, prevDateStr) {
         div.appendChild(fwdDiv);
     }
 
+    // --- ТЕКСТ СООБЩЕНИЯ ---
     let originalText = '';
     if (msg.text && msg.text.trim() !== '') {
         originalText = msg.text;
@@ -1572,44 +1713,67 @@ function buildMessageNode(msg, prevDateStr) {
         div.appendChild(textNode);
     }
 
+    // --- БЛОК ОБЫЧНЫХ ФАЙЛОВ (НЕ ПЕРЕСЛАННЫХ) ---
     if (!msg.forwarded_from && !msg.forwarded_from_message_id && msg.files && msg.files.length > 0) {
         msg.files.forEach(file => {
             const mime = file.mime_type || file.content_type || '';
+            const targetChatId = currentChatId;
+
             if (mime.startsWith('image/')) {
-                const img = document.createElement('img'); img.className = 'message-image'; img.alt = file.file_name;
-                fetch(`${API_BASE}/messages/chats/${currentChatId}/downloads/${file.id}`).then(r => r.blob()).then(b => {
-                    img.src = URL.createObjectURL(b);
-                    img.onclick = () => window.open(img.src, '_blank');
-                    img.onload = autoScrollIfNearBottom;
-                }).catch(() => {});
+                const img = document.createElement('img');
+                img.className = 'message-image';
+                img.alt = file.file_name;
+
+                fetchFileBlobWithRetry(`${API_BASE}/messages/chats/${targetChatId}/downloads/${file.id}`, mime)
+                    .then(correctBlob => {
+                        img.src = URL.createObjectURL(correctBlob);
+                        img.onclick = () => window.open(img.src, '_blank');
+                        img.onload = autoScrollIfNearBottom;
+                    })
+                    .catch((err) => {
+                        console.error(`Ошибка загрузки картинки ${file.file_name}:`, err);
+                        const fileBtn = document.createElement('div');
+                        fileBtn.className = 'file-link';
+                        fileBtn.innerHTML = `⚠️ ${file.file_name} (ошибка)`;
+                        fileBtn.onclick = () => downloadFile(targetChatId, file.id, file.file_name);
+                        img.replaceWith(fileBtn);
+                    });
                 div.appendChild(img);
+
             } else if (mime.startsWith('audio/')) {
-                const audio = document.createElement('audio'); audio.controls = true;
-                fetch(`${API_BASE}/messages/chats/${currentChatId}/downloads/${file.id}`).then(r => r.blob()).then(b => {
-                    audio.src = URL.createObjectURL(b);
-                    audio.onloadedmetadata = autoScrollIfNearBottom;
-                }).catch(() => {});
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                fetchFileBlobWithRetry(`${API_BASE}/messages/chats/${targetChatId}/downloads/${file.id}`, mime)
+                    .then(correctBlob => {
+                        audio.src = URL.createObjectURL(correctBlob);
+                        audio.onloadedmetadata = autoScrollIfNearBottom;
+                    }).catch(err => console.error('Ошибка аудио:', err));
                 div.appendChild(audio);
+
             } else if (mime.startsWith('video/')) {
                 const video = document.createElement('video');
                 video.controls = true;
-                fetch(`${API_BASE}/messages/chats/${currentChatId}/downloads/${file.id}`).then(r => r.blob()).then(b => {
-                    video.src = URL.createObjectURL(b);
-                    video.onloadedmetadata = autoScrollIfNearBottom;
-                }).catch(() => {});
+                fetchFileBlobWithRetry(`${API_BASE}/messages/chats/${targetChatId}/downloads/${file.id}`, mime)
+                    .then(correctBlob => {
+                        video.src = URL.createObjectURL(correctBlob);
+                        video.onloadedmetadata = autoScrollIfNearBottom;
+                    }).catch(err => console.error('Ошибка видео:', err));
                 div.appendChild(video);
+
             } else {
-                const fileBtn = document.createElement('div'); fileBtn.className = 'file-link'; fileBtn.innerHTML = `📎 ${file.file_name}`;
-                fileBtn.onclick = () => downloadFile(currentChatId, file.id, file.file_name);
+                const fileBtn = document.createElement('div');
+                fileBtn.className = 'file-link';
+                fileBtn.innerHTML = `📎 ${file.file_name}`;
+                fileBtn.onclick = () => downloadFile(targetChatId, file.id, file.file_name);
                 div.appendChild(fileBtn);
             }
         });
     }
 
+    // --- КНОПКИ ДЕЙСТВИЙ (ОТВЕТИТЬ, ПЕРЕСЛАТЬ, УДАЛИТЬ) ---
     const actions = document.createElement('div');
     actions.className = 'msg-actions';
 
-    // Кнопка "Ответить"
     const replyBtn = document.createElement('span');
     replyBtn.className = 'msg-action-btn';
     replyBtn.innerHTML = '↩️';
@@ -1617,7 +1781,6 @@ function buildMessageNode(msg, prevDateStr) {
     replyBtn.onclick = () => setReply(msg.id, senderName, originalText || 'Переслано');
     actions.appendChild(replyBtn);
 
-    // Кнопка "Переслать"
     const fwdBtn = document.createElement('span');
     fwdBtn.className = 'msg-action-btn';
     fwdBtn.innerHTML = '➡️';
@@ -1625,10 +1788,6 @@ function buildMessageNode(msg, prevDateStr) {
     fwdBtn.onclick = () => openForwardModal(msg.id, msg.sender_id);
     actions.appendChild(fwdBtn);
 
-    // Кнопка "Удалить" (только если это твое сообщение ИЛИ ты админ/владелец)
-    // isOwner у нас уже есть для комнат. Для сообщений нужно проверять роль.
-    // Для простоты: если это наше сообщение, или если это комната и мы Owner/Admin.
-    // Если роль 2 (ADMIN) или 3 (OWNER)
     const isAdminOrOwner = window.currentUserRole === 2 || window.currentUserRole === 3 || window.currentUserRole === 'ADMIN' || window.currentUserRole === 'OWNER';
     const canDelete = isOwn || (currentRoomId && (isOwner || isAdminOrOwner));
 
@@ -1651,6 +1810,25 @@ function buildMessageNode(msg, prevDateStr) {
     wrapper.appendChild(container);
 
     return { el: wrapper, dateSep: dateSep, dateStr: dateString };
+}
+
+async function deleteCurrentChat() {
+    if (!currentChatId) return;
+    if (!confirm('Вы уверены, что хотите удалить этот чат? Действие необратимо.')) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/chats/${currentChatId}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) throw new Error(await parseError(res));
+
+        // Если удалили — закрываем чат и обновляем список
+        closeChat();
+        await loadChats();
+    } catch (err) {
+        alert('Ошибка удаления чата: ' + err.message);
+    }
 }
 
 function filterChats() {
@@ -1836,7 +2014,7 @@ function connectWebSocket() {
     if (ws) { ws.onclose = null; try { ws.close(); } catch(e) {} ws = null; }
     if (wsReconnectTimeout) { clearTimeout(wsReconnectTimeout); wsReconnectTimeout = null; }
 
-    const token = localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token');
     if (!token) { logout(); return; }
 
     // Показываем, что идет попытка подключения
@@ -1871,15 +2049,15 @@ function connectWebSocket() {
         // Если сокет закрылся из-за протухшего токена (4001), сначала обновляем токен
         if (event.code === 4001) {
             try {
-                const refreshToken = localStorage.getItem('refresh_token');
+                const refreshToken = sessionStorage.getItem('refresh_token');
                 const res = await originalFetch(`${API_BASE}/auth/refresh`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${refreshToken}` }
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    localStorage.setItem('access_token', data.access_token);
-                    localStorage.setItem('refresh_token', data.refresh_token);
+                    sessionStorage.setItem('access_token', data.access_token);
+                    sessionStorage.setItem('refresh_token', data.refresh_token);
                 }
             } catch(e) {}
         }
@@ -1927,6 +2105,20 @@ function connectWebSocket() {
                 alert('Ваша сессия была завершена администратором. Пожалуйста, войдите снова.');
                 logout();
                 return;
+            }
+
+            // Чат был удален
+            if (data.action_type === 'delete_chat' && data.data) {
+                const deletedChatId = String(data.data.chat_id);
+
+                // Если удалили текущий открытый чат — закрываем его
+                if (String(currentChatId) === deletedChatId) {
+                    closeChat();
+                    alert('Этот чат был удален.');
+                }
+
+                // Обновляем список
+                loadChats();
             }
 
             // 3. Статус онлайн/оффлайн
@@ -2025,14 +2217,39 @@ function closeInviteModal() { document.getElementById('invite-modal').classList.
 
 async function submitGenerateInvite() {
     if (isLoggingOut) return;
-    const hours = parseInt(document.getElementById('invite-hours').value) || 24;
+
+    const hoursInput = document.getElementById('invite-hours').value.trim();
+    const maxUsesInput = document.getElementById('invite-max-uses').value.trim();
+
+    const hours = parseInt(hoursInput, 10) || 24;
+
+    // Если поле пустое -> null, иначе -> число
+    let maxUses = null;
+    if (maxUsesInput !== '') {
+        maxUses = parseInt(maxUsesInput, 10);
+    }
+
     try {
-        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) });
+        const res = await fetch(`${API_BASE}/rooms/${currentRoomId}/invite`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json' // <-- ОБЯЗАТЕЛЬНО
+            },
+            body: JSON.stringify({
+                hours: hours,
+                max_uses: maxUses
+            })
+        });
+
+        if (!res.ok) throw new Error(await parseError(res));
+
         const data = await res.json();
         const token = typeof data === 'string' ? data : data.token;
         document.getElementById('invite-result-url').value = `${window.location.origin}/join/${token}`;
         document.getElementById('invite-result-container').classList.remove('hidden');
-    } catch(e) { alert(e.message); }
+    } catch(e) {
+        alert(e.message);
+    }
 }
 
 document.getElementById('messages').addEventListener('scroll', function () {
@@ -2042,7 +2259,7 @@ document.getElementById('messages').addEventListener('scroll', function () {
 async function checkAdminAccess() {
     if (isLoggingOut) return;
     try {
-        const token = localStorage.getItem('access_token');
+        const token = sessionStorage.getItem('access_token');
         if (!token) return;
 
         const base64Url = token.split('.')[1];
