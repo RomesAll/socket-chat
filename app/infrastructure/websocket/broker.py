@@ -169,3 +169,12 @@ class WSBroker:
                 'data': ''
             },
         })
+
+    async def publish_delete_chat(self, chat_id: UUID, member_ids: list[str]):
+        """Отправить сигнал об удалении чата всем его участникам"""
+        for uid in member_ids:
+            await self.publish_to_user(
+                action_type="delete_chat",
+                user_id=uid,
+                data={"chat_id": str(chat_id)}
+            )
