@@ -44,7 +44,7 @@ class InviteTokenService(LogMixin):
 
     async def validate(self, token: str) -> InviteTokenDoc:
         """
-        Проверить и использовать токен
+        Проверить токен
         """
         doc = await self._repo.find_by_token(token)
         if not doc:
@@ -63,8 +63,10 @@ class InviteTokenService(LogMixin):
         if doc.max_uses is not None and doc.used_count >= doc.max_uses:
             raise UrlTokenMaxUses(token)
 
-        await self._repo.increment_used(token)
         return doc
+
+    async def increment_used(self, token: str):
+        await self._repo.increment_used(token)
 
     async def revoke(self, token: str) -> None:
         """Отозвать токен."""

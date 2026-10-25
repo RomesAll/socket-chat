@@ -58,6 +58,8 @@ class JoinByInviteUseCase(LogMixin):
                 f"Пользователь {actor_id} уже в чате {room_id}"
             )
 
+        await self._invite_service.increment_used(token)
+
         # Проверить лимит участников
         room = await self._room_service.get(room_id)
         members = await self._chat_service.get_members(room_id)
