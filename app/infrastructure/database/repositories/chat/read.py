@@ -99,7 +99,7 @@ class ChatReadRepository:
         return rows
 
     async def get_private_chats_preview(self, user_id: str) -> Sequence[Any]:
-        """Получить preview приватных чатов"""
+        """Получить preview приватных чатов (включая Избранное)"""
         user_chats = (
             select(ChatMember.chat_id)
             .where(ChatMember.user_id == user_id)
@@ -116,6 +116,7 @@ class ChatReadRepository:
         stmt = (
             select(
                 Chat.id,
+                Chat.type,
                 Chat.last_message_id,
                 User.avatar_url.label('other_user_avatar'),
                 User.id.label("other_user_id"),
@@ -128,7 +129,7 @@ class ChatReadRepository:
             .where(
                 Chat.id.in_(user_chats),
                 Chat.id.in_(private_chats),
-                Chat.type == ChatType.PRIVATE,
+                Chat.type.in_([ChatType.PRIVATE, ChatType.FAVORITES]),  # <-- ИЗМЕНЕНО
             )
             .outerjoin(
                 companion,

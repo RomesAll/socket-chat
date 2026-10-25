@@ -3,6 +3,7 @@ from app.infrastructure.redis import UnreadCache
 from app.infrastructure.security import SymmetricEncode
 from app.shared.dto.chat import PrivateChatDTO
 from app.shared.dto.message import MessageBriefGetDTO
+from app.shared.dto.enums import ChatType  # <-- ИМПОРТИРУЕМ ТИПЫ
 
 
 class GetPrivateChatsUseCase:
@@ -24,9 +25,15 @@ class GetPrivateChatsUseCase:
 
         result = []
         for chat in chats:
-            companion_id = chat.other_user_id or user_id
-            companion_name = chat.other_user_name or "Избранное (Вы)"
-            companion_avatar = chat.other_user_avatar
+            if chat.type == ChatType.FAVORITES:
+                companion_id = user_id
+                companion_name = "Избранное (Вы)"
+                companion_avatar = None
+            else:
+                companion_id = chat.other_user_id or user_id
+                companion_name = chat.other_user_name or "Без имени"
+                companion_avatar = chat.other_user_avatar
+
             last_msg = None
             if chat.last_message_id:
                 last_msg = MessageBriefGetDTO(
@@ -38,6 +45,7 @@ class GetPrivateChatsUseCase:
 
             result.append(PrivateChatDTO(
                 id=chat.id,
+                type=chat.type,
                 companion_id=companion_id,
                 companion_avatar=companion_avatar,
                 companion_name=companion_name,

@@ -16,6 +16,7 @@ class ChatType(str, Enum):
     """Перечисление типов чатов"""
     PRIVATE = 'PRIVATE'
     ROOM = 'ROOM'
+    FAVORITES = 'FAVORITES'
 
 
 class ChatRole(IntEnum):

@@ -37,6 +37,7 @@ class ChatDTO:
 @dataclass(frozen=True, slots=True)
 class PrivateChatDTO:
     id: UUID
+    type: ChatType
     companion_id: str
     companion_name: str
     count_unread: int
