@@ -31,53 +31,57 @@ class RemoveChatMemberUseCase(LogMixin):
             request_meta: RequestMeta,
     ) -> ChatMemberDTO:
         time_now = datetime.now(tz=timezone.utc)
-
-        # Проверить права
         is_self = actor_id == user_id
-        is_admin = await self._chat_service.is_admin(chat_id, actor_id)
 
-        if not is_self and not is_admin:
-            raise PermissionError(f"Пользователь {actor_id} не админ чата {chat_id}")
-
-        # Получить информацию об участнике
+        # Получить информацию об акторе и target
+        actor = await self._chat_service.get_member(chat_id, actor_id)
         target = await self._chat_service.get_member(chat_id, user_id)
 
-        # Логика для OWNER
-        if target.role == ChatRole.OWNER:
-            if not is_self:
-                raise PermissionError("Нельзя удалить владельца чата")
+        # Проверить права
+        if not is_self and not actor.role.can_manage(target.role):
+            raise PermissionError(f"Пользователь {actor_id} не может удалить {user_id}")
 
-            # Если владелец выходит сам — передаем права
+        chat_deleted = False
+        if target.role == ChatRole.OWNER:
+            # Процесс смены владельца
             new_owner = await self._chat_service.transfer_ownership_on_leave(chat_id, user_id)
 
             if not new_owner:
                 # Если больше никого нет — удаляем чат полностью
                 await self._chat_service.delete(chat_id)
-                return target
+                chat_deleted = True
 
-        # Запрет на удаление другого админа
-        if target.role == ChatRole.ADMIN and not is_self:
-            raise PermissionError("Нельзя удалить другого админа")
+        if not chat_deleted:
+            removed = await self._chat_service.remove_member(chat_id, user_id)
+        else:
+            removed = target
 
-        # Удаление пользователя из чата
-        removed = await self._chat_service.remove_member(chat_id, user_id)
-
-        self._uow.add_after_commit(
-            lambda: self._ws_broker.publish_to_user(
-                action_type="kicked_from_chat",
-                user_id=user_id,
-                data={"chat_id": str(chat_id)}
+        if chat_deleted:
+            self._uow.add_after_commit(
+                lambda: self._ws_broker.publish_to_user(
+                    action_type="chat_deleted",
+                    user_id=user_id,
+                    data={"chat_id": str(chat_id)}
+                )
             )
-        )
-
-        # Отправляем в сам чат, чтобы у остальных обновился список участников (если открыта модалка)
-        self._uow.add_after_commit(
-            lambda: self._ws_broker.publish_to_chat(
-                action_type="member_removed",
-                chat_id=chat_id,
-                data={"user_id": user_id}
+            self.log_info(f"Владелец {actor_id} покинул чат {chat_id}. Чат полностью удален.")
+        else:
+            self._uow.add_after_commit(
+                lambda: self._ws_broker.publish_to_user(
+                    action_type="kicked_from_chat",
+                    user_id=user_id,
+                    data={"chat_id": str(chat_id)}
+                )
             )
-        )
+            self._uow.add_after_commit(
+                lambda: self._ws_broker.publish_to_chat(
+                    action_type="member_removed",
+                    chat_id=chat_id,
+                    data={"user_id": user_id}
+                )
+            )
+            action = "вышел из чата" if is_self else f"удалил {user_id} из чата"
+            self.log_info(f"Пользователь {actor_id} {action} {chat_id}")
 
         # Сохранить событие
         self._uow.add_event(AuditEvent(
@@ -93,6 +97,4 @@ class RemoveChatMemberUseCase(LogMixin):
             ),
             occurred_at=time_now,
         ))
-
-        self.log_info(f"Пользователь {actor_id} удалил {user_id} из чата {chat_id}")
         return removed

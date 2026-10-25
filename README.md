@@ -28,7 +28,7 @@
 * RESTapi (архитектурный стиль);
 * Протокол Websocket (для общения в режиме real-time).
 
-![img_4.png](sceen/img_4.png)
+![img_4.png](screen/img_4.png)
 
 **Паттерны проектирования**. В проекте используются следующие архитектурные паттерны на 
 уровне классов и методов:
@@ -113,33 +113,33 @@
 Окно авторизации и регистрации. Флаг "**Режим разработчика**" нужен для того, 
 чтобы зайти в чат без отправки кода подтверждения:
 
-![img.png](sceen/img.png)
+![img.png](screen/img.png)
 
 Главное меню с чатами. Адаптивно под смартфоны и пк.
 
 Под смартфон:
 
-![img_1.png](sceen/img_1.png) 
+![img_1.png](screen/img_1.png) 
 
 Под ПК:
 
-![img_2.png](sceen/img_2.png)
+![img_2.png](screen/img_2.png)
 
 Админ панель:
 
-![img_3.png](sceen/img_3.png)
+![img_3.png](screen/img_3.png)
 
 Другие:
 
-![img_5.png](sceen/img_5.png)
+![img_5.png](screen/img_5.png)
 
-![img_10.png](sceen/img_10.png)
+![img_10.png](screen/img_10.png)
 
-![img_6.png](sceen/img_6.png)
+![img_6.png](screen/img_6.png)
 
-![img_7.png](sceen/img_7.png)
+![img_7.png](screen/img_7.png)
 
-![img_8.png](sceen/img_8.png)
+![img_8.png](screen/img_8.png)
 
-![img_9.png](sceen/img_9.png)
+![img_9.png](screen/img_9.png)
 

@@ -36,7 +36,7 @@ from .user import (
 )
 
 
-__version__ = 'v1.0.0'
+__version__ = 'v1.0.1'
 __author__ = 'RomesAll'
 __all__ = [
     'SaveUserEvent',

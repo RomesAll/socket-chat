@@ -7,7 +7,7 @@ from .update import UpdateUserUseCase
 
 
 __author__ = 'RomesAll'
-__version__ = 'v1.0.0'
+__version__ = 'v1.0.1'
 __all__ = [
     'ChangeUserRoleUseCase',
     'ChangeUserPasswordUseCase',
