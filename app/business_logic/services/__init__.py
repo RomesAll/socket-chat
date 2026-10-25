@@ -12,7 +12,7 @@ from .user_report_service import UserReportService
 from .audit_service import AuditService
 from .presence_service import PresenceService
 
-__version__ = 'v1.0.0'
+__version__ = 'v1.0.1'
 __author__ = 'RomesAll'
 __all__ = [
     'ChatService',
